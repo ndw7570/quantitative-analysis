@@ -1,0 +1,11 @@
+# 2026-11-25 에 이 조합으로 돌려 확인한 판(Python 3.12.7). 판을 올리면 update.py 를 한 번 돌려 검사를 통과하는지 본다.
+pandas==2.3.3
+numpy==2.5.5
+requests==2.34.2
+yfinance==1.8.0
+statsmodels==0.15.0
+arch==9.0.0
+hmmlearn==0.3.3
+ruptures==1.1.10
+# hynix_report(1년 보고서)의 fetch.py 만 쓴다. 탐색기는 쓰지 않는다.
+pykrx==1.2.9

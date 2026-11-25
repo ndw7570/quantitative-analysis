@@ -1,0 +1,13 @@
+# 가상환경과 파이썬 캐시
+.venv/
+__pycache__/
+
+# 받은 원자료와 계산 결과. 다시 받고 다시 계산할 수 있고(49MB), 남의 자료라 저장소에 싣지 않는다.
+# 규칙은 프로젝트의 plan/specs/data-collection-policy.md
+hynix_explorer/data/
+hynix_report/data/
+
+# 실행 로그와 결과물
+hynix_explorer/logs/
+out/
+*.new.html

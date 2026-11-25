@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SK하이닉스 1년 분석 - 퀀트 도구 실습</title>
+<style>
+:root{
+  color-scheme:light;
+  --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,.10);
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
+  --up:#d03b3b; --down:#2a78d6; --flat:#c3c2b7;
+  --r0:#9ec5f4; --r1:#2a78d6; --r2:#104281;
+  --crit:#d03b3b; --note:#f0efec;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    color-scheme:dark;
+    --page:#0d0d0d; --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+    --up:#e66767; --down:#3987e5; --flat:#52514e;
+    --r0:#184f95; --r1:#3987e5; --r2:#b7d3f6;
+    --crit:#e66767; --note:#262624;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font:16px/1.65 system-ui,-apple-system,"Segoe UI","Malgun Gothic",sans-serif}
+main{max-width:1000px;margin:0 auto;padding:32px 16px 80px}
+h1{font-size:28px;line-height:1.3;margin:0 0 6px}
+h2{font-size:21px;margin:0 0 4px}
+h3{font-size:15px;margin:22px 0 6px;color:var(--ink2)}
+p{margin:8px 0}
+.sub{color:var(--ink2);margin:0 0 4px}
+.q{color:var(--ink2);margin:0 0 14px;font-size:15px}
+section{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;margin:20px 0}
+ul{margin:6px 0;padding-left:20px}
+li{margin:4px 0}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:16px 0 0}
+.tile{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px}
+.tile .k{font-size:13px;color:var(--ink2)}
+.tile .v{font-size:26px;font-weight:650;line-height:1.3}
+.tile .d{font-size:13px;color:var(--ink2)}
+.note{background:var(--note);border-radius:8px;padding:12px 16px;margin:14px 0;font-size:15px}
+.note b{display:block;margin-bottom:2px}
+.chart{position:relative;margin:10px 0 4px}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:13px;color:var(--ink2);margin:10px 0 2px}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
+.legend i.box{height:10px;width:10px;border-radius:2px}
+.legend i.dot{height:8px;width:8px;border-radius:50%}
+.ctitle{font-weight:650;font-size:15px;margin-top:18px}
+.tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  box-shadow:0 4px 16px rgba(0,0,0,.14);padding:8px 10px;font-size:12.5px;line-height:1.5;white-space:nowrap;display:none;z-index:5}
+.tip b{display:block;margin-bottom:2px}
+.tip i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px}
+.tip span{color:var(--ink2)}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:8px 0}
+th,td{padding:7px 10px;border-bottom:1px solid var(--grid);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+th{color:var(--ink2);font-weight:600;font-size:13px}
+th:first-child,td:first-child,td.l,th.l{text-align:left}
+td.l{white-space:normal}
+.tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:10px;border:1px solid var(--border);color:var(--ink2)}
+details{margin-top:10px}
+summary{cursor:pointer;color:var(--ink2);font-size:14px}
+.scroll{max-height:420px;overflow:auto;border:1px solid var(--border);border-radius:8px;margin-top:8px}
+.scroll th{position:sticky;top:0;background:var(--surface)}
+footer{color:var(--muted);font-size:13px;margin-top:28px}
+code{font-size:13px}
+</style>
+</head>
+<body>
+<main>
+
+<h1>SK하이닉스 최근 1년 분석</h1>
+<p class="sub">퀀트 도구 7가지를 실제 데이터에 돌려 본 실습 보고서 · 분석 구간 <span data-v="summary.start_date"></span> ~ <span data-v="summary.end_date"></span> (<span data-v="summary.days"></span>거래일) · 작성 2026-11-21</p>
+<p class="sub">공부용 자료입니다. 매수·매도 권유가 아닙니다.</p>
+
+<div class="tiles">
+  <div class="tile"><div class="k">1년 수익률</div><div class="v" data-v="summary.ret_1y" data-f="pct"></div>
+    <div class="d"><span data-v="summary.start_close" data-f="won"></span> -> <span data-v="summary.end_close" data-f="won"></span></div></div>
+  <div class="tile"><div class="k">고점 대비 현재</div><div class="v" data-v="summary.dd_now" data-f="pct"></div>
+    <div class="d">고점 <span data-v="summary.peak_close" data-f="won"></span> (<span data-v="summary.peak_date"></span>)</div></div>
+  <div class="tile"><div class="k">하루 변동폭(표준편차)</div><div class="v"><span data-v="summary.daily_std" data-f="n2"></span>%</div>
+    <div class="d">직전 2년은 <span data-v="summary.daily_std_pre" data-f="n2"></span>%</div></div>
+  <div class="tile"><div class="k">현재 추세 판정</div><div class="v" data-v="summary.trend_now" data-f="trend"></div>
+    <div class="d">종가가 20일·60일·120일 평균선 모두 아래</div></div>
+</div>
+
+<section>
+<h2>먼저 결론</h2>
+<p class="q">"실적은 좋은데 왜 빠지나, 추세가 꺾인 건가 수급이 꺾인 건가"에 대해 이 데이터가 말해 주는 것</p>
+<ul>
+  <li><b>추세는 꺾였습니다.</b> 고점(<span data-v="summary.peak_date"></span>) 이후 <span data-v="summary.ret_after_peak" data-f="pct"></span>이고, 추세 규칙은 지금 "하락"입니다.</li>
+  <li><b>외국인 순매도는 꺾임의 신호가 아니었습니다.</b> 외국인은 주가가 오르던 고점 이전에도 약 <span data-v="summary.flow_cum_peak.foreign" data-f="jo"></span>을 순매도했습니다. 고점 이후에는 하루 평균 순매도 주식 수가 <span data-v="extra.foreign_shares_per_day_pre" data-f="man"></span>에서 <span data-v="extra.foreign_shares_per_day_post" data-f="man"></span>로 빨라졌습니다.</li>
+  <li><b>하이닉스만의 문제가 아니었습니다.</b> 급락일 10일 모두 삼성전자가 같은 날 <span data-v="extra.events_samsung_best" data-f="pct"></span> ~ <span data-v="extra.events_samsung_worst" data-f="pct"></span> 빠졌습니다. 다만 고점 이후 낙폭은 하이닉스(<span data-v="summary.ret_after_peak" data-f="pct"></span>)가 삼성전자(<span data-v="summary.samsung_after_peak" data-f="pct"></span>)보다 큽니다.</li>
+  <li><b>규칙이 꺾임을 알려 준 것은 늦었습니다.</b> 추세 규칙이 "상승" 판정을 거둔 것은 고점 <span data-v="extra.flat_days_after_peak"></span>거래일 뒤였고, 그때 주가는 이미 고점 대비 <span data-v="extra.signals.3.from_peak" data-f="pct"></span>였습니다.</li>
+</ul>
+<div class="note"><b>이 보고서로 확인하지 못한 것</b>
+"공매도 세력이 작정하고 들어온 구간"은 검증하지 못했습니다. 공매도 데이터는 한국거래소가 로그인을 요구해 받지 못했습니다. 급락일의 뉴스·이벤트도 수집하지 않았습니다. 그래서 "왜 빠졌는가"의 원인은 이 보고서에 없고, "언제, 누구와 함께, 얼마나 이상하게 빠졌는가"까지만 있습니다.</div>
+</section>
+
+<section>
+<h2>1. 추세 판정 - 이동평균</h2>
+<p class="q">답하는 질문: 지금 상승인가, 하락인가, 보합인가</p>
+<h3>읽는 법</h3>
+<ul>
+  <li>이동평균선은 최근 N일 종가의 평균입니다. 20일선은 약 1개월, 60일선은 약 3개월, 120일선은 약 6개월의 평균 매수 단가로 볼 수 있습니다.</li>
+  <li>이 보고서의 추세 규칙은 세 가지를 봅니다: 종가가 20일선 위인가, 20일선이 60일선 위인가, 60일선이 10일 전보다 높은가. 셋 다 "예"면 상승, 셋 다 "아니오"면 하락, 섞이면 보합입니다.</li>
+  <li>차트 아래 띠가 그날의 판정입니다.</li>
+</ul>
+<div class="ctitle">종가와 이동평균선 (원)</div>
+<div id="c1"></div>
+<h3>이 데이터에서 나온 것</h3>
+<ul>
+  <li>245거래일 중 상승 <span data-v="summary.trend_days.up"></span>일, 보합 <span data-v="summary.trend_days.flat"></span>일, 하락 <span data-v="summary.trend_days.down"></span>일.</li>
+  <li>현재 종가 <span data-v="summary.end_close" data-f="won"></span> &lt; 20일선 <span data-v="summary.ma20" data-f="won"></span> &lt; 60일선 <span data-v="summary.ma60" data-f="won"></span> &lt; 120일선 <span data-v="summary.ma120" data-f="won"></span>. 짧은 평균일수록 아래에 있는 전형적인 하락 배열입니다.</li>
+  <li>1년 동안 판정이 <span data-v="extra.trend_flips"></span>번 바뀌었습니다. 하루 만에 뒤집힌 경우가 많습니다.</li>
+</ul>
+<h3>한계</h3>
+<ul>
+  <li>평균은 과거 값이라 항상 늦습니다. 고점 뒤 판정이 바뀐 날짜와 그때의 낙폭은 8번 표에 있습니다.</li>
+  <li>판정이 자주 뒤집히는 구간에서는 규칙대로 사고팔면 잔손실이 쌓입니다.</li>
+</ul>
+</section>
+
+<section>
+<h2>2. ARIMA - 정상 범위 만들기</h2>
+<p class="q">답하는 질문: 오늘 움직임은 평소 범위 안인가</p>
+<h3>읽는 법</h3>
+<ul>
+  <li>ARIMA 는 과거 값과 과거 예측 오차로 내일 값을 예측하는 모델입니다. 여기서는 예측 자체가 아니라 "내일 종가가 95% 확률로 들어올 범위"를 얻는 데 썼습니다.</li>
+  <li>계수는 분석 구간 이전 2년 데이터로만 추정했습니다. 그날 실제로 알 수 있었던 정보만 쓰기 위해서입니다.</li>
+  <li>아래 차트의 점은 하루 등락률이고, 주황 선이 ARIMA 범위, 초록 선이 3번에서 설명할 GARCH 범위입니다.</li>
+</ul>
+<div class="ctitle">하루 등락률과 두 가지 정상 범위 (%)</div>
+<div id="c2"></div>
+<h3>이 데이터에서 나온 것</h3>
+<ul>
+  <li>ARIMA 범위는 거의 고정폭(약 ±<span data-v="extra.ar_band" data-f="n1"></span>%)입니다. 95% 범위이므로 이탈은 5%쯤이어야 하는데, 실제로는 <span data-v="summary.ar_out_n"></span>일(<span data-v="summary.ar_out_pct" data-f="n1"></span>%)이 벗어났습니다.</li>
+  <li>이유: ARIMA 는 변동폭이 항상 같다고 가정합니다. 이 종목의 하루 변동폭은 직전 2년 <span data-v="summary.daily_std_pre" data-f="n2"></span>%에서 최근 1년 <span data-v="summary.daily_std" data-f="n2"></span>%로 커졌습니다.</li>
+</ul>
+<div class="ctitle">ARIMA 가 맞는 대상과 안 맞는 대상</div>
+<p>자기상관(어제 값과 오늘 값이 닮은 정도, -1 ~ 1)을 재 보면 어디에 쓸 수 있는지 보입니다.</p>
+<div class="tw"><table id="t_acf"></table></div>
+<ul>
+  <li>수익률의 자기상관은 0과 구분되지 않습니다. 어제 올랐다고 오늘 오른다고 할 수 없다는 뜻이고, 수익률 예측에 ARIMA 가 약한 이유입니다.</li>
+  <li>거래량은 자기상관이 뚜렷합니다. ARIMA 는 거래량의 정상 범위를 만드는 데 더 잘 맞습니다.</li>
+  <li>수익률의 크기(절댓값)는 약하지만 통계적으로 유의한 자기상관이 있습니다. 크게 움직인 다음 날도 크게 움직인다는 뜻이고, GARCH 가 다루는 대상입니다.</li>
+</ul>
+</section>
+
+<section>
+<h2>3. GARCH - 변동성</h2>
+<p class="q">답하는 질문: 내일 얼마나 크게 움직일 것으로 보는가 (방향은 아님)</p>
+<h3>읽는 법</h3>
+<ul>
+  <li>GARCH 는 "오늘 예상 변동폭 = 어제의 충격 + 어제의 예상 변동폭"으로 계산합니다. 범위가 매일 넓어졌다 좁아졌다 합니다.</li>
+  <li>아래 선은 그날 아침 기준으로 예상한 하루 변동폭(%)입니다.</li>
+  <li>실제 등락을 예상 변동폭으로 나눈 값을 "배수"라고 부르겠습니다. 배수가 ±2를 넘으면 그날 기준으로도 이상하게 큰 움직임입니다. 9번 표에서 이 배수를 씁니다.</li>
+</ul>
+<div class="ctitle">GARCH 예상 하루 변동폭 (%)</div>
+<div id="c3"></div>
+<h3>이 데이터에서 나온 것</h3>
+<ul>
+  <li>예상 변동폭은 최저 <span data-v="summary.gvol_min" data-f="n2"></span>%에서 최고 <span data-v="summary.gvol_max" data-f="n2"></span>%(<span data-v="summary.gvol_max_date"></span>)까지 움직였고, 현재 <span data-v="summary.gvol_now" data-f="n2"></span>%입니다.</li>
+  <li>GARCH 범위 이탈은 <span data-v="summary.g_out_n"></span>일(<span data-v="summary.g_out_pct" data-f="n1"></span>%)로 ARIMA(<span data-v="summary.ar_out_pct" data-f="n1"></span>%)보다 훨씬 적습니다. 그래도 기대치 5%의 두 배입니다.</li>
+</ul>
+<h3>한계</h3>
+<ul>
+  <li>계수를 조용했던 직전 2년으로 추정해서, 변동성이 커지는 속도를 따라가지 못했습니다. 실전에서는 계수를 주기적으로 다시 추정합니다.</li>
+  <li>이 종목은 하락 때 변동성이 더 커지는 비대칭이 추정되지 않았습니다(비대칭 계수 <span data-v="summary.garch_params.gamma[1]" data-f="n4"></span>, 0에 가까움).</li>
+</ul>
+</section>
+
+<section>
+<h2>4. HMM - 국면 분류</h2>
+<p class="q">답하는 질문: 지금 시장은 어떤 상태에 있는가</p>
+<h3>읽는 법</h3>
+<ul>
+  <li>HMM 은 눈에 보이지 않는 "국면"이 몇 개 있고 국면마다 수익률의 성질이 다르다고 가정한 뒤, 각 날짜가 어느 국면에 속하는지 추정합니다.</li>
+  <li>국면을 3개로 정하고, 하루 수익률과 최근 10일 변동폭을 입력으로 넣었습니다. 최근 3년 전체로 학습했습니다.</li>
+</ul>
+<div class="ctitle">종가와 HMM 국면 (원)</div>
+<div id="c4"></div>
+<div class="tw"><table id="t_reg"></table></div>
+<h3>이 데이터에서 나온 것</h3>
+<ul>
+  <li>HMM 이 나눈 것은 "상승·하락"이 아니라 <b>변동성의 크기</b>였습니다. 세 국면의 하루 평균 수익률은 비슷하고, 변동폭이 크게 다릅니다.</li>
+  <li>최근 1년의 <span data-v="extra.regime2_share"></span>%가 고변동 국면입니다. 급등 구간과 급락 구간이 같은 국면으로 묶였습니다.</li>
+  <li>고변동 국면은 고점 <span data-v="extra.hv_days_before_peak"></span>거래일 전에 시작됐습니다. 주가가 가장 가파르게 오르던 때입니다.</li>
+</ul>
+<h3>한계</h3>
+<ul>
+  <li>이 분류는 3년 전체를 본 뒤에 붙인 사후 분류입니다. 그날 실시간으로 알 수 있었던 판정이 아닙니다.</li>
+  <li>방향을 알려 주지 않으므로 추세 규칙(1번)과 같이 써야 합니다. "고변동 + 하락"과 "고변동 + 상승"은 전혀 다른 상황입니다.</li>
+  <li>국면 개수 3은 사람이 정한 값입니다.</li>
+</ul>
+</section>
+
+<section>
+<h2>5. 변화점 탐지</h2>
+<p class="q">답하는 질문: 수익률의 성질이 언제 바뀌었는가</p>
+<h3>읽는 법</h3>
+<ul>
+  <li>변화점 탐지는 시계열을 몇 개 구간으로 잘랐을 때 구간 안은 비슷하고 구간끼리는 다르게 되는 경계를 찾습니다. 여기서는 PELT 라는 알고리즘으로 하루 수익률의 평균과 변동폭이 바뀐 지점을 찾았습니다.</li>
+  <li>세로선이 찾은 경계입니다.</li>
+</ul>
+<div class="ctitle">종가와 변화점 (원)</div>
+<div id="c5"></div>
+<div class="tw"><table id="t_seg"></table></div>
+<h3>이 데이터에서 나온 것</h3>
+<ul>
+  <li>1년이 5개 구간으로 나뉘었습니다. 완만한 상승, 급등, 고변동 하락, 조용한 횡보, 다시 하락 순서입니다.</li>
+  <li>급등에서 하락으로 넘어간 경계는 종가 고점보다 앞에 잡혔습니다. 고점 직전 구간이 이미 그 전과 다른 성질(변동폭 확대)이었다는 뜻입니다.</li>
+</ul>
+<h3>한계</h3>
+<ul>
+  <li>이것도 1년 전체를 본 뒤 계산한 사후 결과입니다. 실시간으로는 경계가 지난 뒤 최소 15거래일(이 분석의 최소 구간 길이)은 지나야 잡힙니다.</li>
+  <li>민감도 설정에 따라 경계 개수가 달라집니다.</li>
+</ul>
+</section>
+
+<section>
+<h2>6. 수급 - 누가 사고 팔았나</h2>
+<p class="q">답하는 질문: 가격을 움직인 주체는 누구인가</p>
+<h3>읽는 법</h3>
+<ul>
+  <li>순매수는 산 금액에서 판 금액을 뺀 값입니다. 아래 선은 분석 시작일부터 순매수를 계속 더한 누적값입니다. 선이 내려가면 계속 팔고 있다는 뜻입니다.</li>
+  <li>금액은 "순매수 주식 수 x 그날 종가"로 어림한 값입니다. 실제 체결 금액과는 차이가 있습니다.</li>
+</ul>
+<div class="ctitle">투자자별 누적 순매수 (조원, 어림값)</div>
+<div id="c6"></div>
+<div class="ctitle">외국인 지분율 (%)</div>
+<div id="c7"></div>
+<h3>이 데이터에서 나온 것</h3>
+<div class="tw"><table id="t_flow"></table></div>
+<ul>
+  <li>외국인은 1년 내내 팔았고 개인이 받았습니다. 상승기에도 외국인 누적은 내려갔습니다.</li>
+  <li>따라서 "외국인이 팔기 시작했다"는 꺾임 신호로 쓸 수 없었습니다. 달라진 것은 속도입니다: 하루 평균 순매도가 고점 전 <span data-v="extra.foreign_shares_per_day_pre" data-f="man"></span>에서 고점 후 <span data-v="extra.foreign_shares_per_day_post" data-f="man"></span>로 늘었습니다.</li>
+  <li>고점 후 <span data-v="summary.days_after_peak"></span>거래일 중 <span data-v="summary.foreign_sell_days_after_peak"></span>일이 외국인 순매도였습니다.</li>
+  <li>최근 20일 외국인 순매수는 <span data-v="summary.flow_20_now.foreign" data-f="jo"></span>입니다. 최근 120일 분포에서 표준편차 <span data-v="summary.flow_z_now.foreign" data-f="n2"></span>배 위치로, 최근 반년 기준으로는 평소 수준의 매도입니다.</li>
+</ul>
+<h3>한계와 이상한 점</h3>
+<ul>
+  <li>외국인 지분율이 하루에 1%p 넘게 움직인 날이 있는데, 그날의 장내 순매매로는 설명되지 않습니다. 원인은 확인하지 못했습니다.</li>
+</ul>
+<div class="tw"><table id="t_jump"></table></div>
+<ul>
+  <li>수급 값이 비어 있는 날이 3일 있습니다(2026-02-24, 05-26, 08-24).</li>
+  <li>공매도와 대차잔고(빌려 간 주식 수)는 없습니다. 외국인 순매도 안에 공매도가 얼마나 섞였는지는 알 수 없습니다.</li>
+</ul>
+</section>
+
+<section>
+<h2>7. 상대 비교 - 종목 탓인가 업종 탓인가</h2>
+<p class="q">답하는 질문: 하이닉스만 빠졌나, 다 같이 빠졌나</p>
+<h3>읽는 법</h3>
+<ul>
+  <li>위 차트는 네 가지를 시작일 = 100으로 맞춘 것입니다. SOX 는 미국 필라델피아 반도체지수입니다.</li>
+  <li>아래 차트의 "고유분"은 하이닉스 수익률에서 삼성전자와 SOX 움직임으로 설명되는 부분을 뺀 나머지를 누적한 값입니다. 올라가면 하이닉스만 따로 더 오른 것, 내려가면 하이닉스만 따로 더 빠진 것입니다.</li>
+  <li>코스피는 비교 기준으로 쓰지 않았습니다. 하이닉스가 코스피에서 차지하는 비중이 커서, 코스피로 하이닉스를 설명하면 자기 자신으로 자기를 설명하게 됩니다.</li>
+</ul>
+<div class="ctitle">시작일 = 100 으로 맞춘 비교</div>
+<div id="c8"></div>
+<div class="ctitle">하이닉스 고유분 누적 (로그수익률 %)</div>
+<div id="c9"></div>
+<h3>이 데이터에서 나온 것</h3>
+<div class="tw"><table id="t_rel"></table></div>
+<ul>
+  <li>고점 이후 넷 다 크게 빠졌습니다. 반도체 전반의 하락입니다.</li>
+  <li>고유분 누적은 고점 때 <span data-v="summary.abn_cum_peak" data-f="n1s"></span>에서 현재 <span data-v="summary.abn_cum_end" data-f="n1s"></span>로 내려왔습니다. 상승기에 하이닉스가 따로 더 올랐던 부분이 대부분 사라졌습니다.</li>
+</ul>
+<h3>한계</h3>
+<ul>
+  <li>삼성전자·SOX 에 대한 민감도는 직전 2년 데이터로 추정했고 설명력(R²)은 <span data-v="summary.ols_r2" data-f="n2"></span>입니다. 하이닉스 움직임의 절반 이상은 이 두 가지로 설명되지 않습니다.</li>
+  <li>민감도는 시기에 따라 바뀝니다. 고정값을 쓴 것이 이 계산의 약점입니다.</li>
+</ul>
+</section>
+
+<section>
+<h2>8. 고점 전후 신호가 나온 순서</h2>
+<p class="q">답하는 질문: 각 도구는 꺾임을 언제 알려 줬는가</p>
+<div class="tw"><table id="t_sig"></table></div>
+<ul>
+  <li>"실시간"은 그날 장이 끝나면 알 수 있었던 판정이고, "사후"는 지나고 나서 전체 데이터로 계산한 것입니다.</li>
+  <li>고점보다 앞선 신호 두 개는 모두 사후 계산입니다. 실시간으로 쓸 수 있었던 추세 규칙은 고점 뒤에 나왔습니다.</li>
+  <li>앞선 두 신호가 알려 준 것은 "하락 시작"이 아니라 "변동폭 확대"입니다. 그 신호 뒤에도 주가는 각각 <span data-v="extra.signals.0.to_peak" data-f="pct"></span>, <span data-v="extra.signals.1.to_peak" data-f="pct"></span> 더 올랐으므로, 매도 신호로 썼다면 너무 일렀습니다.</li>
+  <li>급등 말기에 변동폭이 커진다는 관찰 자체는 남지만, 이번 한 번의 사례입니다.</li>
+</ul>
+</section>
+
+<section>
+<h2>9. 급락일 10일 뜯어 보기</h2>
+<p class="q">답하는 질문: 크게 빠진 날, 무엇이 같이 일어났는가</p>
+<p>분석 구간에서 하루 등락률이 가장 낮았던 10일입니다. SOX 는 한국 장이 열리기 직전 미국 장의 등락입니다.</p>
+<div class="tw"><table id="t_ev"></table></div>
+<h3>이 데이터에서 나온 것</h3>
+<ul>
+  <li>10일 모두 삼성전자가 같은 날 크게 빠졌습니다. 종목 하나를 겨냥한 하락으로 보기 어렵습니다.</li>
+  <li>그런데 직전 미국 반도체지수는 10일 중 <span data-v="extra.events_sox_mild"></span>일이 -3%보다 덜 빠졌거나 올랐습니다. 미국에서 넘어온 충격만으로는 설명되지 않는 한국 쪽 요인이 있었다는 뜻입니다. 그 요인이 무엇인지는 이 데이터로 알 수 없습니다.</li>
+  <li>10일 중 <span data-v="extra.events_foreign_sell"></span>일이 외국인 순매도, <span data-v="extra.events_indiv_buy"></span>일이 개인 순매수였습니다.</li>
+  <li>배수가 ±2를 넘은 날은 <span data-v="extra.events_gz_over2"></span>일입니다. 이미 변동폭이 큰 시기였는데도 그 기준으로 이상하게 큰 하락이었습니다.</li>
+  <li>고유분은 10일 모두 음수입니다(<span data-v="extra.events_abn_best" data-f="n1s"></span> ~ <span data-v="extra.events_abn_worst" data-f="n1s"></span>). 같이 빠지는 날 하이닉스가 조금씩 더 빠졌습니다.</li>
+</ul>
+<div class="note"><b>다음에 붙일 것</b>
+이 표의 날짜에 뉴스와 공매도 비중을 붙이면 처음에 말씀하신 "작정하고 들어온 구간" 판별이 됩니다. 판별 기준은 네 가지가 같은 날 겹치는지입니다: 배수 ±2 초과, 거래량 급증, 공매도 비중 급증, 부정적 뉴스 집중.</div>
+</section>
+
+<section>
+<h2>데이터와 방법</h2>
+<div class="tw"><table>
+<tr><th>항목</th><th class="l">출처</th><th class="l">확인한 것</th></tr>
+<tr><td>하이닉스·삼성전자 가격</td><td class="l">한국거래소(pykrx)</td><td class="l">하이닉스는 네이버 종가와 245거래일 전부 일치. 삼성전자는 대조하지 않음</td></tr>
+<tr><td>투자자별 순매매·외국인 지분율</td><td class="l">네이버 증권</td><td class="l">월별 순매매와 지분율 변화가 대체로 일치. 하루 1%p 넘게 어긋난 날은 6번에 표시</td></tr>
+<tr><td>코스피</td><td class="l">네이버 증권</td><td class="l">야후 파이낸스 값과 일치(야후에 값이 없는 마지막 날 제외)</td></tr>
+<tr><td>미국 반도체지수(SOX)</td><td class="l">야후 파이낸스</td><td class="l">다른 출처와 대조하지 않음</td></tr>
+<tr><td>공매도·대차잔고·PER·PBR</td><td class="l">받지 못함</td><td class="l">한국거래소가 로그인을 요구</td></tr>
+<tr><td>뉴스·공시</td><td class="l">수집하지 않음</td><td class="l">-</td></tr>
+</table></div>
+<ul>
+  <li>ARIMA(1,1,1), GJR-GARCH(1,1), 삼성전자·SOX 민감도: 분석 구간 이전 약 2년(2023-11 ~ 2025-11) 데이터로 추정한 뒤 고정했습니다.</li>
+  <li>HMM(3국면)은 3년 전체로, 변화점(PELT)은 분석 구간 1년 전체로 계산했습니다. 둘 다 사후 계산입니다.</li>
+  <li>이 가격 수준과 등락폭은 받은 데이터 그대로이며, 제가 별도 자료로 사실 여부를 검증한 것은 위 표의 대조가 전부입니다.</li>
+</ul>
+<details><summary>일별 데이터 표 보기 (245거래일)</summary><div class="scroll"><table id="t_all"></table></div></details>
+</section>
+
+<footer>코드: development/source/hynix_report/ (fetch.py, fetch_flow.py, analyze.py, build.py)</footer>
+</main>
+
+<script>
+const R = __DATA__;
+const S = R.series, N = S.date.length;
+const css = k => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
+const F = {
+  won: v => Math.round(v).toLocaleString('ko-KR') + '원',
+  int: v => Math.round(v).toLocaleString('ko-KR'),
+  pct: v => (v > 0 ? '+' : '') + v.toFixed(1) + '%',
+  n1: v => v.toFixed(1), n2: v => v.toFixed(2), n4: v => v.toFixed(4),
+  n1s: v => (v > 0 ? '+' : '') + v.toFixed(1),
+  jo: v => (v > 0 ? '+' : '') + v.toFixed(1) + '조원',
+  man: v => (v > 0 ? '+' : '') + v.toFixed(1) + '만 주',
+  trend: v => ({up: '상승', down: '하락', flat: '보합'})[v],
+};
+const TREND = {up: ['상승', '--up'], flat: ['보합', '--flat'], down: ['하락', '--down']};
+const REG = {0: ['저변동', '--r0'], 1: ['중변동', '--r1'], 2: ['고변동', '--r2']};
+document.querySelectorAll('[data-v]').forEach(el => {
+  // "garch_params.gamma[1]" 처럼 키 자체에 대괄호가 든 경우가 있어 점으로만 자른다
+  let v = R; for (const k of el.dataset.v.split('.')) v = v?.[k];
+  el.textContent = v == null ? '?' : (el.dataset.f ? F[el.dataset.f](v) : v);
+});
+
+const NS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs, parent, text) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (text != null) e.textContent = text;
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function niceTicks(lo, hi, n) {
+  const step0 = (hi - lo) / n, mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= step0);
+  const out = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(+v.toFixed(10));
+  return out;
+}
+
+/* cfg: {lines:[{name,keys,color,fmt,w}], points:{key,flag,name,flagName}, strips:[{name,key,map}],
+        vlines:[{date,label}], h, fmt, zero} */
+function chart(id, cfg) {
+  const host = document.getElementById(id);
+  host.className = 'chart';
+  const lines = cfg.lines || [], strips = cfg.strips || [];
+  // 범례: 2개 이상 계열이거나 띠·점이 있을 때만
+  const lg = document.createElement('div'); lg.className = 'legend';
+  const addLg = (cls, color, name) => { const s = document.createElement('span');
+    s.innerHTML = `<i class="${cls}" style="background:var(${color})"></i>${name}`; lg.appendChild(s); };
+  if (lines.length > 1 || cfg.points || strips.length) lines.forEach(l => addLg('', l.color, l.name));
+  if (cfg.points) { addLg('dot', '--muted', cfg.points.name); addLg('dot', '--crit', cfg.points.flagName); }
+  strips.forEach(st => Object.values(st.map).forEach(([nm, c]) => addLg('box', c, st.name + ': ' + nm)));
+  if (lg.children.length) host.appendChild(lg);
+
+  const W = 940, m = {l: 70, r: 92, t: 36, b: 26}, ph = cfg.h || 280;
+  const sh = strips.length * 16, H = m.t + ph + sh + m.b;
+  const svg = el('svg', {viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': cfg.aria || ''});
+  host.appendChild(svg);
+  const x = i => m.l + i / (N - 1) * (W - m.l - m.r);
+  let vals = [];
+  lines.forEach(l => l.keys.forEach(k => vals.push(...S[k].filter(v => v != null))));
+  if (cfg.points) vals.push(...S[cfg.points.key].filter(v => v != null));
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  if (cfg.zero) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
+  const pad = (hi - lo) * 0.06; lo -= cfg.zero && lo === 0 ? 0 : pad; hi += pad;
+  const y = v => m.t + (hi - v) / (hi - lo) * ph;
+  const fmt = cfg.fmt || (v => v.toLocaleString('ko-KR'));
+
+  niceTicks(lo, hi, 5).forEach(t => {
+    el('line', {x1: m.l, x2: W - m.r, y1: y(t), y2: y(t), stroke: `var(${t === 0 ? '--axis' : '--grid'})`, 'stroke-width': 1}, svg);
+    el('text', {x: m.l - 8, y: y(t) + 4, 'text-anchor': 'end', 'font-size': 11.5, fill: 'var(--muted)'}, svg, fmt(t));
+  });
+  const yb = m.t + ph + sh;
+  el('line', {x1: m.l, x2: W - m.r, y1: m.t + ph, y2: m.t + ph, stroke: 'var(--axis)', 'stroke-width': 1}, svg);
+  S.date.forEach((d, i) => {
+    if (i && d.slice(0, 7) !== S.date[i - 1].slice(0, 7)) {
+      el('line', {x1: x(i), x2: x(i), y1: yb, y2: yb + 4, stroke: 'var(--axis)'}, svg);
+      el('text', {x: x(i), y: yb + 17, 'text-anchor': 'middle', 'font-size': 11.5, fill: 'var(--muted)'}, svg,
+        d.slice(5, 7) === '01' ? d.slice(2, 4) + '.01' : d.slice(5, 7) + '월');
+    }
+  });
+  (cfg.vlines || []).forEach((v, k) => {
+    const i = S.date.indexOf(v.date); if (i < 0) return;
+    // 라벨을 그림 영역 위 여백에 두 줄로 엇갈려 둔다. 영역 안에 두면 가격선과 겹친다.
+    const ly = m.t - 20 + (k % 2) * 13;
+    el('line', {x1: x(i), x2: x(i), y1: ly - 8, y2: m.t + ph, stroke: 'var(--ink2)', 'stroke-width': 1}, svg);
+    el('text', {x: x(i) + 4, y: ly, 'font-size': 11.5, fill: 'var(--ink2)'}, svg, v.label);
+  });
+  strips.forEach((st, r) => {
+    const yy = m.t + ph + 4 + r * 16, half = (x(1) - x(0)) / 2;
+    el('text', {x: m.l - 8, y: yy + 9, 'text-anchor': 'end', 'font-size': 11.5, fill: 'var(--muted)'}, svg, st.name);
+    let a = 0;
+    for (let i = 1; i <= N; i++) if (i === N || S[st.key][i] !== S[st.key][a]) {
+      const c = st.map[S[st.key][a]];
+      if (c) el('rect', {x: x(a) - half, y: yy, width: x(i - 1) - x(a) + 2 * half - 0.6, height: 10, fill: `var(${c[1]})`}, svg);
+      a = i;
+    }
+  });
+  if (cfg.points) {
+    const p = cfg.points;
+    S[p.key].forEach((v, i) => { if (v == null) return; const f = S[p.flag][i];
+      el('circle', {cx: x(i), cy: y(v), r: f ? 3.6 : 2, fill: `var(${f ? '--crit' : '--muted'})`,
+        stroke: f ? 'var(--surface)' : 'none', 'stroke-width': 1}, svg); });
+  }
+  const ends = [];
+  lines.forEach(l => l.keys.forEach((k, ki) => {
+    let d = '', pen = false, last = null;
+    S[k].forEach((v, i) => { if (v == null) return; d += (pen ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1); pen = true; last = v; });
+    el('path', {d, fill: 'none', stroke: `var(${l.color})`, 'stroke-width': l.w || 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round'}, svg);
+    if (ki === 0 && !l.noEnd && (lines.length > 1 || cfg.endLabel)) ends.push({y: y(last), name: l.short || l.name, color: l.color});
+  }));
+  // 끝 라벨이 겹치면 아래로 밀어낸다
+  ends.sort((a, b) => a.y - b.y);
+  ends.forEach((e, i) => { if (i && e.y - ends[i - 1].y < 14) e.y = ends[i - 1].y + 14; });
+  ends.forEach(e => {
+    el('circle', {cx: W - m.r + 7, cy: e.y, r: 3.5, fill: `var(${e.color})`}, svg);
+    el('text', {x: W - m.r + 14, y: e.y + 4, 'font-size': 11.5, fill: 'var(--ink2)'}, svg, e.name);
+  });
+
+  // 호버: 세로 기준선 + 그날 값 전부
+  const cross = el('line', {y1: m.t, y2: m.t + ph + sh, stroke: 'var(--ink2)', 'stroke-width': 1, visibility: 'hidden'}, svg);
+  const tip = document.createElement('div'); tip.className = 'tip'; host.appendChild(tip);
+  svg.addEventListener('mousemove', ev => {
+    const bb = svg.getBoundingClientRect(), px = (ev.clientX - bb.left) / bb.width * W;
+    const i = Math.max(0, Math.min(N - 1, Math.round((px - m.l) / (W - m.l - m.r) * (N - 1))));
+    cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i)); cross.setAttribute('visibility', 'visible');
+    let h = `<b>${S.date[i]}</b>`;
+    const fv = (v, f) => v == null ? '-' : (f || fmt)(v);
+    if (cfg.points) h += `<div><i style="background:var(${S[cfg.points.flag][i] ? '--crit' : '--muted'})"></i><span>${cfg.points.name}</span> ${fv(S[cfg.points.key][i])}</div>`;
+    lines.forEach(l => { h += `<div><i style="background:var(${l.color})"></i><span>${l.name}</span> ${l.keys.map(k => fv(S[k][i], l.fmt)).join(' ~ ')}</div>`; });
+    strips.forEach(st => { const c = st.map[S[st.key][i]]; if (c) h += `<div><i style="background:var(${c[1]})"></i><span>${st.name}</span> ${c[0]}</div>`; });
+    (cfg.extraTip || []).forEach(t => { h += `<div><span>${t.name}</span> ${fv(S[t.key][i], t.fmt)}</div>`; });
+    tip.innerHTML = h; tip.style.display = 'block';
+    const hb = host.getBoundingClientRect(), tx = ev.clientX - hb.left;
+    tip.style.left = (tx > hb.width * 0.6 ? tx - tip.offsetWidth - 14 : tx + 14) + 'px';
+    tip.style.top = Math.max(0, ev.clientY - hb.top - 20) + 'px';
+  });
+  svg.addEventListener('mouseleave', () => { cross.setAttribute('visibility', 'hidden'); tip.style.display = 'none'; });
+}
+
+const won = v => Math.round(v).toLocaleString('ko-KR');
+const manwon = v => (v / 10000).toLocaleString('ko-KR') + '만';
+const pc = v => (v > 0 ? '+' : '') + v.toFixed(1) + '%';
+const sg = d => v => (v > 0 ? '+' : '') + v.toFixed(d);
+const trendStrip = {name: '추세', key: 'trend', map: TREND};
+const peakV = {date: R.summary.peak_date, label: '고점'};
+
+chart('c1', {aria: '종가와 이동평균선', fmt: manwon, strips: [trendStrip], vlines: [peakV], lines: [
+  {name: '종가', keys: ['close'], color: '--ink', fmt: won, w: 2},
+  {name: '20일선', keys: ['ma20'], color: '--s1', fmt: won, w: 1.6},
+  {name: '60일선', keys: ['ma60'], color: '--s2', fmt: won, w: 1.6},
+  {name: '120일선', keys: ['ma120'], color: '--s3', fmt: won, w: 1.6}],
+  extraTip: [{name: '등락률', key: 'chg', fmt: pc}]});
+chart('c2', {aria: '하루 등락률과 정상 범위', fmt: pc, zero: true, h: 300, vlines: [peakV],
+  points: {key: 'chg', flag: 'g_out', name: '하루 등락률', flagName: 'GARCH 범위 이탈'}, lines: [
+  {name: 'ARIMA 95% 범위', short: 'ARIMA', keys: ['ar_hi_pct', 'ar_lo_pct'], color: '--s2', fmt: pc, w: 1.6},
+  {name: 'GARCH 95% 범위', short: 'GARCH', keys: ['g_hi_pct', 'g_lo_pct'], color: '--s3', fmt: pc, w: 1.6}]});
+chart('c3', {aria: 'GARCH 예상 변동폭', fmt: v => v.toFixed(1) + '%', h: 200, vlines: [peakV], lines: [
+  {name: '예상 하루 변동폭', keys: ['gvol'], color: '--s1', fmt: v => v.toFixed(2) + '%'}],
+  extraTip: [{name: '실제 등락률', key: 'chg', fmt: pc}, {name: '배수', key: 'gz', fmt: sg(2)}]});
+chart('c4', {aria: '종가와 HMM 국면', fmt: manwon, h: 220, vlines: [peakV],
+  strips: [{name: '국면', key: 'regime', map: REG}, trendStrip],
+  lines: [{name: '종가', keys: ['close'], color: '--ink', fmt: won, noEnd: true}]});
+chart('c5', {aria: '종가와 변화점', fmt: manwon, h: 220,
+  vlines: R.changepoints.map((d, i) => ({date: d, label: '변화점 ' + d.slice(5)})),
+  lines: [{name: '종가', keys: ['close'], color: '--ink', fmt: won}]});
+const jo = v => (v > 0 ? '+' : '') + v.toFixed(1) + '조';
+chart('c6', {aria: '투자자별 누적 순매수', fmt: v => v.toFixed(0) + '조', zero: true, vlines: [peakV], lines: [
+  {name: '외국인', keys: ['foreign_cum'], color: '--s1', fmt: jo},
+  {name: '기관', keys: ['inst_cum'], color: '--s2', fmt: jo},
+  {name: '개인', keys: ['indiv_cum'], color: '--s3', fmt: jo}],
+  extraTip: [{name: '그날 외국인', key: 'foreign_val', fmt: sg(2)}, {name: '종가', key: 'close', fmt: won}]});
+chart('c7', {aria: '외국인 지분율', fmt: v => v.toFixed(1) + '%', h: 170, vlines: [peakV], lines: [
+  {name: '외국인 지분율', keys: ['foreign_ratio'], color: '--s1', fmt: v => v.toFixed(2) + '%'}]});
+const ix = v => v.toFixed(0);
+chart('c8', {aria: '지수화 비교', fmt: ix, vlines: [peakV], lines: [
+  {name: 'SK하이닉스', short: '하이닉스', keys: ['close_idx'], color: '--s1', fmt: ix},
+  {name: '삼성전자', keys: ['samsung_idx'], color: '--s2', fmt: ix},
+  {name: 'SOX', keys: ['sox_idx'], color: '--s3', fmt: ix},
+  {name: '코스피', keys: ['kospi_idx'], color: '--s4', fmt: ix}]});
+chart('c9', {aria: '하이닉스 고유분 누적', fmt: sg(0), zero: true, h: 190, vlines: [peakV], lines: [
+  {name: '고유분 누적', keys: ['abn_cum'], color: '--s1', fmt: sg(1)}],
+  extraTip: [{name: '그날 고유분', key: 'abn', fmt: sg(1)}]});
+
+// ---------- 표 ----------
+function table(id, head, rows) {
+  document.getElementById(id).innerHTML = '<tr>' + head.map(h => `<th${h[0] === '<' ? ' class="l"' : ''}>${h.replace(/^</, '')}</th>`).join('') + '</tr>' +
+    rows.map(r => '<tr>' + r.map((c, i) => `<td${head[i][0] === '<' ? ' class="l"' : ''}>${c}</td>`).join('') + '</tr>').join('');
+}
+const p = v => v < 0.001 ? '0.001 미만' : v.toFixed(3);
+const A = R.acf;
+table('t_acf', ['대상', '1일 전과의 자기상관', '5일 전과의 자기상관', '우연일 확률(p값)', '<판정'], [
+  ['하루 수익률', A.ret.lag1.toFixed(3), A.ret.lag5.toFixed(3), p(A.ret.lb_p), A.ret.lb_p < 0.05 ? '자기상관 있음' : '0과 구분 안 됨'],
+  ['수익률의 크기(절댓값)', A.abs_ret.lag1.toFixed(3), A.abs_ret.lag5.toFixed(3), p(A.abs_ret.lb_p), A.abs_ret.lb_p < 0.05 ? '자기상관 있음' : '0과 구분 안 됨'],
+  ['거래량(로그)', A.log_vol.lag1.toFixed(3), A.log_vol.lag5.toFixed(3), p(A.log_vol.lb_p), A.log_vol.lb_p < 0.05 ? '자기상관 뚜렷' : '0과 구분 안 됨']]);
+table('t_reg', ['국면', '최근 1년 중 일수', '3년 전체 일수', '하루 평균 수익률', '하루 변동폭'],
+  R.regimes.map(r => [REG[r.k][0], r.days_win + '일', r.days_all + '일', (r.mean > 0 ? '+' : '') + r.mean.toFixed(2) + '%', r.std.toFixed(2) + '%']));
+table('t_seg', ['구간', '거래일', '하루 평균 수익률', '하루 변동폭', '구간 수익률'],
+  R.segments.map(s => [s.start + ' ~ ' + s.end, s.days + '일', (s.mean > 0 ? '+' : '') + s.mean.toFixed(2) + '%', s.std.toFixed(2) + '%', pc(s.cum)]));
+const sm = R.summary, ex = R.extra;
+table('t_flow', ['누적 순매수(어림값)', '고점 이전 ' + ex.pre_days + '일', '고점 이후 ' + ex.post_days + '일', '1년 합계'],
+  [['외국인', 'foreign'], ['기관', 'inst'], ['개인', 'indiv']].map(([n, k]) =>
+    [n, F.jo(sm.flow_cum_peak[k]), F.jo(sm.flow_after_peak[k]), F.jo(sm.flow_cum_end[k])]));
+table('t_jump', ['날짜', '지분율 변화', '그날 외국인 순매매', '지분율'],
+  ex.jumps.map(j => [j.date, (j.dr > 0 ? '+' : '') + j.dr.toFixed(2) + '%p', (j.net > 0 ? '+' : '') + won(j.net) + '주', j.ratio.toFixed(2) + '%']));
+table('t_rel', ['', '1년 (시작일 = 100)', '고점일 이후'], [
+  ['SK하이닉스', sm.idx_end.close.toFixed(1), pc(sm.ret_after_peak)],
+  ['삼성전자', sm.idx_end.samsung.toFixed(1), pc(sm.samsung_after_peak)],
+  ['SOX(미국 반도체지수)', sm.idx_end.sox.toFixed(1), pc(sm.sox_after_peak)],
+  ['코스피', sm.idx_end.kospi.toFixed(1), pc(sm.kospi_after_peak)]]);
+table('t_sig', ['날짜', '<무슨 일', '종가', '고점과의 거리', '<알 수 있었던 시점'],
+  ex.signals.map(s => [s.date, s.what, won(s.close) + '원',
+    s.from_peak === 0 ? '고점' : s.before ? '이후 ' + pc(s.to_peak) + ' 더 오름' : '고점 대비 ' + pc(s.from_peak),
+    s.live == null ? '-' : `<span class="tag">${s.live ? '실시간' : '사후'}</span>`]));
+table('t_ev', ['날짜', '하이닉스', '삼성전자', '코스피', 'SOX(직전)', '고유분', '배수', '거래량(20일 평균 대비)', '외국인(조)', '기관(조)', '개인(조)'],
+  R.events.map(e => [e.date, pc(e.chg), pc(e.samsung), pc(e.kospi), pc(e.sox), sg(1)(e.abn), sg(2)(e.gz),
+    e.vol_ratio.toFixed(2) + '배', sg(2)(e.foreign), sg(2)(e.inst), sg(2)(e.indiv)]));
+const nn = (v, f) => v == null ? '-' : f(v);
+table('t_all', ['날짜', '종가', '등락률', '추세', '국면', '예상 변동폭', '배수', '외국인(조)', '기관(조)', '개인(조)', '외국인 지분율', '고유분'],
+  S.date.map((d, i) => [d, won(S.close[i]), pc(S.chg[i]), TREND[S.trend[i]][0], REG[S.regime[i]][0],
+    S.gvol[i].toFixed(2) + '%', sg(2)(S.gz[i]), nn(S.foreign_val[i], sg(2)), nn(S.inst_val[i], sg(2)), nn(S.indiv_val[i], sg(2)),
+    nn(S.foreign_ratio[i], v => v.toFixed(2) + '%'), sg(1)(S.abn[i])]).reverse());
+</script>
+</body>
+</html>
