@@ -3,7 +3,8 @@
 쓰는 법 (이 폴더에서):
     ../.venv/Scripts/python.exe update.py              # 새 날짜만 받아서 다시 만든다
     ../.venv/Scripts/python.exe update.py --full       # 수급을 2005년부터 전부 다시 받는다(약 15분)
-    ../.venv/Scripts/python.exe update.py --no-fetch   # 받지 않고 지금 있는 자료로 다시 만든다(화면만 고쳤을 때)
+    ../.venv/Scripts/python.exe update.py --today      # 18시 전이라도 오늘 한국 장까지 받는다(15:40 부터. 오늘 수급은 빈다)
+    ../.venv/Scripts/python.exe update.py --no-fetch  # 받지 않고 지금 있는 자료로 다시 만든다(화면만 고쳤을 때)
     ../.venv/Scripts/python.exe update.py --out 경로   # 다른 곳에 만든다
 
 단계를 손으로 따로 돌리면 한 단계를 빼먹거나 실패한 단계 뒤를 그대로 이어 돌리게 된다.
@@ -139,7 +140,7 @@ def main():
     out.parent.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
     if "--no-fetch" not in args:
-        step("fetch", *(["--full"] if "--full" in args else []))
+        step("fetch", *[a for a in ("--full", "--today") if a in args])
     px_end = freshness()
     step("analyze")
     step("signals")

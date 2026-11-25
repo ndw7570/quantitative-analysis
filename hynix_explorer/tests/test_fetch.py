@@ -226,6 +226,13 @@ class KospiFlow(Base):
         self.assertEqual(sorted(self.calls), ["20261119", "20261124"])  # 받은 날은 다시 부르지 않는다
         self.assertIn(pd.Timestamp("2026-11-24"), self.saved("naver_flow_kospi.csv").index)
 
+    def test_does_not_keep_todays_value_before_it_settles(self):
+        self.unposted = set()  # 서버는 오늘 값을 주지만(장 마감 직후 값) 한번 남기면 다시 받지 않으므로 부르지 않는다
+        with mock.patch.object(fetch, "UNSETTLED", "20261124"):
+            self.run_job(fetch.kospi_flow, self, date(2026, 11, 24))
+        self.assertNotIn("20261124", self.calls)
+        self.assertNotIn(pd.Timestamp("2026-11-24"), self.saved("naver_flow_kospi.csv").index)
+
 
 if __name__ == "__main__":
     unittest.main()

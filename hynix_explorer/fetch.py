@@ -6,6 +6,7 @@
 사용: python fetch.py              (전부)
       python fetch.py kr_price us  (고른 것만. 이름은 맨 아래 JOBS)
       python fetch.py flow --full  (종목 수급을 처음부터 다시 받는다. 평소에는 새로 생긴 날만 받는다)
+      python fetch.py --today      (18시 전이라도 오늘 한국 장까지 받는다. 15:40 부터)
 보통은 직접 부르지 않고 update.py 가 부른다. 하나라도 실패하면 종료 코드 1 로 끝난다(update.py 가 거기서 멈춘다).
 어디서 무엇을 받는지와 그 규칙은 프로젝트의 plan/specs/data-collection-policy.md 가 정한다(이 파일은 그것을 따른다).
 로그인·키가 필요한 출처는 쓰지 않는다.
@@ -27,8 +28,13 @@ OUT.mkdir(exist_ok=True)
 # 오늘 것은 받지 않는다. 장중에 돌리면 오늘 줄이 미완성 값(장중 가격, 집계 전 수급)으로 들어와
 # 마지막 날의 모든 지표가 틀리고, 코스피 수급은 그 값이 파일에 남아 다음 실행에서도 안 고쳐진다.
 # 다만 18시가 지나면 오늘 것도 받는다 - 한국 장(15:30)이 끝났고 수급 집계도 나왔다고 본다(집계 시각은 확인 안 함).
+# --today 를 주면 18시 전이라도 오늘 것까지 받는다 - 장이 끝난 뒤 저녁까지 기다리지 않고 오늘 종가를 보려는 것이다.
+# 그때 종목 수급은 아직 안 올라와 있고(15:48 에 확인), 검사가 "수급이 가격보다 뒤처졌다"고 알린다.
 TODAY = date.today()
-START, END = date(1994, 1, 1), TODAY if datetime.now().hour >= 18 else TODAY - timedelta(days=1)
+START, END = date(1994, 1, 1), TODAY if datetime.now().hour >= 18 or "--today" in sys.argv else TODAY - timedelta(days=1)
+# 18시 전의 오늘 코스피 수급은 장 마감 직후 값이라 뒤에 바뀔 수 있는데, 한번 파일에 들어가면 다시 받지 않는다.
+# 그래서 그 시각에는 오늘 것을 남기지 않는다. 18시 뒤의 실행이 받는다.
+UNSETTLED = TODAY.strftime("%Y%m%d") if datetime.now().hour < 18 else None
 S, E = START.strftime("%Y%m%d"), END.strftime("%Y%m%d")
 # 네이버 증권의 코스피 투자자별 순매수는 2005-01-03 부터 있다. 그 앞 날짜는 오류 대신 0, 0, 0 이 온다(2026-11-25 확인).
 KOSPI_FLOW_FROM = "20050101"
@@ -148,7 +154,7 @@ def kospi_flow():
     days = pd.read_csv(OUT / "naver_px_kospi.csv", index_col=0, parse_dates=True).index
     have = pd.read_csv(f, index_col=0, parse_dates=True) if f.exists() else pd.DataFrame()
     rows = {d.strftime("%Y%m%d"): r.to_dict() for d, r in have.iterrows()}
-    todo = [d for d in (x.strftime("%Y%m%d") for x in days) if d >= KOSPI_FLOW_FROM and d not in rows]
+    todo = [d for d in (x.strftime("%Y%m%d") for x in days) if d >= KOSPI_FLOW_FROM and d not in rows and d != UNSETTLED]
 
     def save():
         df = pd.DataFrame.from_dict(rows, orient="index")
@@ -222,6 +228,10 @@ def now():
 
 JOBS = {f.__name__: f for f in (kr_price, us, flow, kospi_flow, now)}
 if __name__ == "__main__":  # 테스트가 이 파일을 불러올 때는 받지 않는다
+    if "--today" in sys.argv and datetime.now().strftime("%H:%M") < "15:40":
+        # 장중 가격이 오늘 종가인 것처럼 저장된다. 15:30 마감 뒤 종가가 올라올 틈을 두고 받는다
+        print("[FAIL] --today 는 한국 장이 끝난 뒤(15:40 부터)에만 쓴다", flush=True)
+        sys.exit(1)
     failed = []
     for name in ([a for a in sys.argv[1:] if not a.startswith("--")] or JOBS):
         try:

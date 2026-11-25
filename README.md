@@ -31,6 +31,7 @@ python -m venv .venv
 ```
 cd hynix_explorer
 ..\.venv\Scripts\python update.py              새 날짜만 받아서 다시 만든다 (보통 이것, 6~10분)
+..\.venv\Scripts\python update.py --today      18시 전이라도 오늘 한국 장까지 받는다 (15:40 부터. 오늘 수급은 빈다)
 ..\.venv\Scripts\python update.py --no-fetch   받지 않고 다시 만든다 (화면만 고쳤을 때)
 ..\.venv\Scripts\python update.py --full       종목 수급을 2005년부터 전부 다시 받는다
 ..\.venv\Scripts\python update.py --out <경로> 다른 곳에 만든다
