@@ -142,6 +142,47 @@ class CheckYears(unittest.TestCase):
             self.assertIn("naver_px_kosdaq.csv", check.errors[0])
 
 
+class CheckRates(unittest.TestCase):
+    """탭 4 의 범위 검사. 옛 자료의 초고금리·초물가는 진짜 값이라 통과해야 하고, 요즘 값이 그러면 단위가 틀린 것이다."""
+
+    def run_check(self, steps, cpi):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        d = Path(tmp.name)
+        for f in ("bis_rates.csv", "bis_cpi.csv"):
+            (d / f).write_text("", encoding="utf-8")
+        data = {"start": steps[0][0], "end": "2026-11-17", "areas": {"BR": {"last": "2026-11-17", "steps": steps, "cpi": cpi}}}
+        with mock.patch.object(check, "D", d), mock.patch.object(check, "errors", []), mock.patch.object(check, "RATES", {"BR": ("브라질", "신흥")}), \
+                mock.patch.object(check, "rate_data", lambda: data), contextlib.redirect_stdout(io.StringIO()) as out:
+            check.check_rates()
+            return list(check.errors), out.getvalue()
+
+    def test_old_hyperinflation_values_pass(self):
+        errors, out = self.run_check([["1990-02-19", 790799.14], ["1999-12-31", 19.0], ["2026-11-01", 15.0]],
+                                     {"from": "1999-11", "v": [6821.22, 8.0] + [5.0] * 321})  # 2026-09 까지
+        self.assertEqual((errors, out), ([], ""))
+
+    def test_recent_value_out_of_range_is_an_error(self):
+        errors, _ = self.run_check([["1999-12-31", 19.0], ["2020-01-01", 1500.0]], {"from": "2026-08", "v": [5.0, 5.0]})
+        self.assertEqual(len(errors), 1)
+        self.assertIn("정책금리 브라질", errors[0])
+        errors, _ = self.run_check([["1999-12-31", 19.0]], {"from": "2026-08", "v": [5.0, 118.2]})  # 지수(2010 = 100) 줄을 읽은 경우
+        self.assertEqual(len(errors), 1)
+        self.assertIn("소비자물가 브라질", errors[0])
+
+    def test_country_without_cpi_is_an_error(self):
+        errors, _ = self.run_check([["1999-12-31", 19.0]], None)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("소비자물가 브라질", errors[0])
+
+    def test_missing_file_is_an_error_not_a_crash(self):
+        with tempfile.TemporaryDirectory() as t, mock.patch.object(check, "D", Path(t)), mock.patch.object(check, "errors", []), \
+                contextlib.redirect_stdout(io.StringIO()):
+            check.check_rates()
+            self.assertEqual(len(check.errors), 1)
+            self.assertIn("bis_cpi.csv", check.errors[0])
+
+
 class RatesLayout(unittest.TestCase):
     def test_template_has_one_rates_slot_where_check_looks_for_it(self):
         html = (HERE / "template.html").read_text(encoding="utf-8")

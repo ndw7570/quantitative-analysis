@@ -79,7 +79,6 @@ def year_data():
     return {"days": YEAR_DAYS, "idx": idx}
 
 
-RATE_FROM = "1995-01-01"  # 탭 3 의 S&P500 과 같은 해부터 보여 준다
 RATE_FILL = 31  # 이 날수까지 빈 곳은 직전 값을 잇는다. 받은 자료에서 연휴로 빈 가장 긴 곳이 15일이었다(태국 2020-11, 2026-11-26 확인)
 
 
@@ -91,6 +90,7 @@ def rate_steps(wide):
     - 주말·연휴처럼 짧게 빈 곳(RATE_FILL 일까지)은 직전 값을 잇는다.
     - 그보다 길게 빈 곳은 통째로 비운다. 일본은 몇 해씩 비어 있는 기간이 세 번 있고 BIS 가 그중 2013-04 ~ 2016-09 를 "no policy rate"로 적어 두었다. 이으면 없던 금리를 그리게 된다.
     - 나라마다 마지막 날이 달라도 뒤를 메우지 않는다. 그 사이에 금리가 바뀌었을 수 있다. 선은 받은 날(last)에서 끝난다.
+    - 앞도 자르지 않는다. 나라마다 받은 첫날부터 싣는다(전에는 1995년부터만 실었다). start 는 가장 이른 나라의 첫날이고 화면의 가로축이 거기서 시작한다.
     steps: [[날짜, 값], ...]. 그날부터 다음 단계 전날(마지막 단계는 last)까지 그 값이다. 값이 None 이면 그 동안 정책금리가 없다.
     """
     areas = {}
@@ -100,25 +100,40 @@ def rate_steps(wide):
             continue
         s = wide[c].reindex(pd.date_range(have.index[0], have.index[-1]))
         run = s.isna().groupby(s.notna().cumsum()).transform("sum")  # 각 날이 속한 빈 구간의 길이
-        s = s.ffill().where(s.notna() | (run <= RATE_FILL)).loc[RATE_FROM:].round(4)
-        if s.dropna().empty:
-            continue
-        s = s.loc[s.first_valid_index():]
+        s = s.ffill().where(s.notna() | (run <= RATE_FILL)).round(4)
         prev = s.shift()
         turn = s.ne(prev) & ~(s.isna() & prev.isna())  # NaN 은 자기 자신과도 다르다고 나와서 따로 뺀다
         areas[c] = {"last": have.index[-1].strftime("%Y-%m-%d"),
                     "steps": [[d.strftime("%Y-%m-%d"), None if pd.isna(v) else float(v)] for d, v in s[turn].items()]}
-    return {"start": RATE_FROM, "end": max(a["last"] for a in areas.values()), "areas": areas}
+    return {"start": min(a["steps"][0][0] for a in areas.values()), "end": max(a["last"] for a in areas.values()), "areas": areas}
+
+
+def cpi_months(s, start):
+    """한 나라의 소비자물가 상승률을 화면에 싣는 모양으로: {"from": 첫 달, "v": [달마다 값]}. 실을 값이 없으면 None.
+
+    s: 달(YYYY-MM)이 색인인 값(fetch.cpi 가 만든 bis_cpi.csv 의 한 열). start(YYYY-MM) 앞은 버린다 - 화면의 가로축이 정책금리의 첫날에서 시작한다.
+    첫 값이 있는 달부터 마지막 값이 있는 달까지 한 달도 빼지 않고 싣는다(v 의 k 번째가 from 에서 k 달 뒤다).
+    빈 달은 None 으로 두고 메우지 않는다 - 금리와 달리 직전 값이 이어진다고 볼 근거가 없다. 화면이 빈 달의 앞뒤를 곧게 잇는다.
+    """
+    s = s.loc[start:].dropna()
+    if s.empty:
+        return None
+    months = pd.period_range(s.index[0], s.index[-1], freq="M").strftime("%Y-%m")
+    return {"from": months[0], "v": [None if pd.isna(v) else float(v) for v in s.reindex(months).round(2)]}
 
 
 def rate_data():
-    """탭 4 에 싣는 것 전부: rate_steps 에 화면 이름·묶음(assets.RATES)과 BIS 의 금리 설명을 붙인다.
+    """탭 4 에 싣는 것 전부: rate_steps 에 화면 이름·묶음(assets.RATES), BIS 의 금리 설명, 같은 나라의 소비자물가 상승률(cpi)을 붙인다.
+    물가를 따로 싣지 않고 나라 안에 넣은 것은 화면이 나라를 고르면 금리와 물가를 같이 그리기 때문이다.
     build.py 와 check.py 가 같이 쓴다 - 따로 만들면 "HTML 에 든 값이 자료와 같은가"를 비교할 수 없다."""
     out = rate_steps(pd.read_csv(D / "bis_rates.csv", index_col=0, parse_dates=True)[list(RATES)])
     notes = json.loads((D / "bis_rates_meta.json").read_text(encoding="utf-8"))
+    cpi = pd.read_csv(D / "bis_cpi.csv", index_col=0)
+    cpi.index = cpi.index.astype(str)
     for c, a in out["areas"].items():
         a["name"], a["group"] = RATES[c]
         a["note"] = notes.get(c, "")
+        a["cpi"] = cpi_months(cpi[c], out["start"][:7]) if c in cpi.columns else None
     return out
 
 

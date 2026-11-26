@@ -26,12 +26,21 @@ BROWSERS = [r"C:\Program Files\Google\Chrome\Application\chrome.exe",
             r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
             r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"]
 # 처음 열었을 때 그려지는 차트 수. 화면 구성을 바꾸면 같이 고친다.
-# 탭 1 이 15개(2026-11-25 에 센 값), 탭 3 과 탭 4 가 1개씩(숨겨진 채로도 한 번 그린다 - template.html 의 yearRender, rateRender).
-MIN_CHARTS = 17
+# 탭 1 이 15개(2026-11-25 에 센 값), 탭 3 이 1개, 탭 4 가 2개(정책금리, 소비자물가. 숨겨진 채로도 한 번 그린다 - template.html 의 yearRender, rateRender).
+MIN_CHARTS = 18
 # 탭 3 의 한 해 수익률이 이 범위를 벗어나면 단위가 바뀌었거나 지수 기준이 중간에 달라진 것으로 본다.
 # 받은 자료의 최고는 코스닥 1999년 +240.7%, 최저는 코스닥 2000년 -79.5% 다(2026-11-26 확인).
 YEAR_RANGE = (-90, 400)
 RATE_LATE = 45  # 정책금리가 이 날수 넘게 뒤처진 나라는 알린다. BIS 는 나라마다 며칠에서 몇 주 늦게 싣는다
+CPI_LATE = 4  # 소비자물가가 이 달수 넘게 뒤처진 나라는 알린다. 호주는 분기에 한 번 와서 석 달까지 늦는다
+# 탭 4 의 범위는 이 날 뒤의 값만 본다. 그 앞에는 진짜로 수백 % 를 넘긴 때가 있어 한 줄로 자를 수 없다
+# (받은 자료: 정책금리 브라질 1990-02 790,799%, 스웨덴 1992-09 500%, 뉴질랜드 1985-03 265%, 러시아 1993-10 210%,
+#  물가 브라질 1990-04 6,821%, 폴란드 1990-02 1,367%, 일본 1947-11 194% - 2026-11-26 확인. 중앙은행 발표와 대조하지는 않았다).
+# 이 날 뒤로 받은 자료는 정책금리 -0.75(스위스·덴마크) ~ 57%(튀르키예 2002), 물가 -5.3(홍콩 2000년대 초) ~ 85.5%(튀르키예 2022)다.
+RANGE_FROM, RATE_RANGE, CPI_RANGE = "2000-01", (-5, 100), (-10, 150)
+# 지수(2010 = 100) 줄을 상승률로 잘못 읽으면 값이 100 안팎이라 위 범위에 걸리지 않는다. 그래서 가운데 값도 본다.
+# 이 날 뒤 물가 상승률의 중앙값은 나라마다 0.2(일본) ~ 10.9%(튀르키예)다(2026-11-26 확인). 지수라면 중앙값이 수십을 넘는다.
+CPI_MID = 30
 errors = []
 
 
@@ -177,22 +186,40 @@ def check_years():
 
 
 def check_rates():
-    """탭 4 의 정책금리. 값이 틀려도 화면은 멀쩡히 그려지므로 범위와 날짜를 본다."""
-    if not (D / "bis_rates.csv").exists():
-        err("bis_rates.csv 가 없다(fetch.py rates 로 받는다)")
+    """탭 4 의 정책금리와 소비자물가. 값이 틀려도 화면은 멀쩡히 그려지므로 범위와 날짜를 본다."""
+    lost = [f for f in ("bis_rates.csv", "bis_cpi.csv") if not (D / f).exists()]
+    if lost:
+        err(f"탭 4 에 쓸 파일이 없다: {lost} (fetch.py rates cpi 로 받는다)")
         return
     r = rate_data()
+
+    def off(vals, lim):
+        return bool(vals) and (min(vals) < lim[0] or max(vals) > lim[1])
+
+    cpi_end = {}
     for c, (name, _) in RATES.items():
         a = r["areas"].get(c)
         if a is None:
-            err(f"정책금리 {name}: {r['start']} 뒤로 값이 하나도 없다")
+            err(f"정책금리 {name}: 값이 하나도 없다")
             continue
-        vals = [v for _, v in a["steps"] if v is not None]
-        if min(vals) < -5 or max(vals) > 300:  # 받은 자료의 최고는 러시아 200%(1990년대), 최저는 스위스·덴마크 -0.75%
-            err(f"정책금리 {name}: 값이 {min(vals)} ~ {max(vals)} % 다(단위가 바뀌었거나 다른 줄을 읽었다)")
+        vals = [v for d, v in a["steps"] if v is not None and d >= RANGE_FROM]
+        if off(vals, RATE_RANGE):
+            err(f"정책금리 {name}: {RANGE_FROM} 뒤의 값이 {min(vals)} ~ {max(vals)} % 다(단위가 바뀌었거나 다른 줄을 읽었다)")
         late = (pd.Timestamp(r["end"]) - pd.Timestamp(a["last"])).days
         if late > RATE_LATE:
             warn(f"정책금리 {name}: {a['last']} 까지만 왔다(가장 늦게까지 온 나라는 {r['end']}). 그 뒤에 바뀐 금리는 화면에 없다")
+        p = a.get("cpi")
+        if not p:
+            err(f"소비자물가 {name}: 값이 하나도 없다")
+            continue
+        months = pd.period_range(p["from"], periods=len(p["v"]), freq="M").strftime("%Y-%m")
+        cpi_end[name] = months[-1]
+        vals = [v for m, v in zip(months, p["v"]) if v is not None and m >= RANGE_FROM]
+        if off(vals, CPI_RANGE) or (vals and sorted(vals)[len(vals) // 2] > CPI_MID):
+            err(f"소비자물가 {name}: {RANGE_FROM} 뒤의 상승률이 {min(vals)} ~ {max(vals)} %, 가운데 값 {sorted(vals)[len(vals) // 2]} % 다(단위가 바뀌었거나 다른 줄을 읽었다)")
+    for name, m in cpi_end.items():
+        if (pd.Period(max(cpi_end.values()), "M") - pd.Period(m, "M")).n > CPI_LATE:
+            warn(f"소비자물가 {name}: {m} 까지만 왔다(가장 늦게까지 온 나라는 {max(cpi_end.values())})")
 
 
 def check_html(path):
@@ -214,7 +241,7 @@ def check_html(path):
         err("HTML 에 든 지수별 연도 값(탭 3)이 data/ 의 종가로 다시 계산한 값과 다르다")
     mark4 = "const RATES = "
     if mark4 not in html or json.JSONDecoder().raw_decode(html, html.index(mark4) + len(mark4))[0] != rate_data():
-        err("HTML 에 든 정책금리(탭 4)가 data/bis_rates.csv 로 다시 계산한 값과 다르다")
+        err("HTML 에 든 정책금리·소비자물가(탭 4)가 data/ 의 bis_rates.csv, bis_cpi.csv 로 다시 계산한 값과 다르다")
     if not errors:
         print("HTML 에 든 값이 data/ 와 같다:", len(ALL), "대상,", ALL["kospi"]["R"]["series"]["date"][-1], "까지")
 

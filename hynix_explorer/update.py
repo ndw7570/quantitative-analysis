@@ -78,7 +78,7 @@ def last_day(path):
 def freshness():
     """자료가 며칠까지 들어왔는지. 가격보다 수급이 뒤처져 있으면 화면의 마지막 날 수급이 비어 있게 된다."""
     kinds = {"한국 가격": "naver_px_*.csv", "미국 가격": "yf_*.csv", "한국 수급": "naver_flow_*.csv",
-             "정책금리": "bis_rates.csv"}  # 정책금리는 가장 늦게까지 온 나라의 날짜다. 나라별로는 check.py 가 본다
+             "정책금리": "bis_rates.csv", "소비자물가": "bis_cpi.csv"}  # 둘 다 가장 늦게까지 온 나라의 날짜(물가는 달)다. 나라별로는 check.py 가 본다
     days = {label: {p.stem: last_day(p) for p in sorted(DATA.glob(pat))} for label, pat in kinds.items()}
     print("\n자료의 마지막 날")
     for label, d in days.items():

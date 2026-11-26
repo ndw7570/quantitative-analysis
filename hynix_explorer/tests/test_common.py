@@ -193,10 +193,12 @@ class RateSteps(unittest.TestCase):
         hole = common.rate_steps(self.wide(A={day(0): 1.0, day(common.RATE_FILL + 2): 0.5}))
         self.assertEqual(hole["areas"]["A"]["steps"], [[day(0), 1.0], [day(1), None], [day(common.RATE_FILL + 2), 0.5]])
 
-    def test_starts_with_the_value_in_force_on_the_first_day_shown(self):
-        r = common.rate_steps(self.wide(A={**self.daily("1994-06-01", "1995-02-28", 7.0), **self.daily("1995-03-01", "1995-03-05", 6.0)}))
-        self.assertEqual(r["start"], common.RATE_FROM)
-        self.assertEqual(r["areas"]["A"]["steps"], [[common.RATE_FROM, 7.0], ["1995-03-01", 6.0]])
+    def test_nothing_is_cut_at_the_front_and_start_is_the_earliest_country(self):
+        # 전에는 1995-01-01 앞을 잘랐다. 이제 나라마다 받은 첫날부터 싣는다
+        r = common.rate_steps(self.wide(A={**self.daily("1954-07-01", "1954-07-31", 7.0), **self.daily("1954-08-01", "1954-08-05", 6.0)},
+                                        B=self.daily("1946-01-01", "1946-01-05", 3.0)))
+        self.assertEqual(r["start"], "1946-01-01")
+        self.assertEqual(r["areas"]["A"]["steps"], [["1954-07-01", 7.0], ["1954-08-01", 6.0]])
 
     def test_each_country_ends_on_its_own_last_day(self):
         # 늦게 오는 나라의 뒤를 메우지 않는다. 그 사이에 금리가 바뀌었을 수 있다
@@ -210,16 +212,32 @@ class RateSteps(unittest.TestCase):
         self.assertEqual(list(common.rate_steps(w)["areas"]), ["A"])
 
 
+class CpiMonths(unittest.TestCase):
+    """물가를 화면에 싣는 모양. 달이 하나라도 밀리면 선 전체가 옆으로 어긋난다."""
+
+    def test_runs_month_by_month_from_first_to_last_value_and_keeps_holes_empty(self):
+        s = pd.Series({"2019-11": 9.0, "2019-12": None, "2020-01": None, "2020-02": 1.234, "2020-03": None, "2020-05": 2.0, "2020-06": None})
+        got = common.cpi_months(s, "2020-01")  # 2020-04 는 줄 자체가 없다
+        self.assertEqual(got, {"from": "2020-02", "v": [1.23, None, None, 2.0]})
+
+    def test_nothing_to_show_is_none(self):
+        self.assertIsNone(common.cpi_months(pd.Series({"2019-11": 9.0, "2020-01": None}), "2020-01"))
+
+
 class RateData(Base):
-    def test_attaches_screen_name_group_and_the_source_note(self):
+    def test_attaches_screen_name_group_the_source_note_and_the_cpi(self):
         self.csv("bis_rates.csv", [("2020-01-01", 1.0, 9.0), ("2020-01-02", 1.25, 9.0)], ["US", "KR"])
         (self.d / "bis_rates_meta.json").write_text('{"US": "mid-point <of> the target"}', encoding="utf-8")
+        # 달 색인은 글자다(2020-01). self.csv 는 날짜로 바꿔 쓰므로 직접 쓴다. 금리가 시작하는 달(2020-01) 앞의 물가는 싣지 않는다
+        (self.d / "bis_cpi.csv").write_text("month,US,KR\n2019-12,2.0,\n2020-01,2.5,\n2020-02,2.3,\n", encoding="utf-8-sig")
         with mock.patch.object(common, "RATES", {"KR": ("한국", "주요"), "US": ("미국", "주요")}):
             r = common.rate_data()
         self.assertEqual(list(r["areas"]), ["KR", "US"])  # 화면 순서는 파일의 열 순서가 아니라 assets.RATES 순서다
         self.assertEqual(r["areas"]["US"], {"last": "2020-01-02", "steps": [["2020-01-01", 1.0], ["2020-01-02", 1.25]],
-                                            "name": "미국", "group": "주요", "note": "mid-point <of> the target"})
+                                            "name": "미국", "group": "주요", "note": "mid-point <of> the target",
+                                            "cpi": {"from": "2020-01", "v": [2.5, 2.3]}})
         self.assertEqual(r["areas"]["KR"]["note"], "")
+        self.assertIsNone(r["areas"]["KR"]["cpi"])  # 물가가 없는 나라도 금리는 싣는다(검사는 check.py 가 한다)
 
 
 if __name__ == "__main__":

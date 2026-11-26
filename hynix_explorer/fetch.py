@@ -7,7 +7,7 @@
       python fetch.py kr_price us  (고른 것만. 이름은 맨 아래 JOBS)
       python fetch.py flow --full  (종목 수급을 처음부터 다시 받는다. 평소에는 새로 생긴 날만 받는다)
       python fetch.py --today      (18시 전이라도 오늘 한국 장까지 받는다. 15:40 부터)
-      python fetch.py rates        (주요국 정책금리만. 국제결제은행 BIS)
+      python fetch.py rates cpi    (주요국 정책금리와 소비자물가만. 국제결제은행 BIS)
 보통은 직접 부르지 않고 update.py 가 부른다. 하나라도 실패하면 종료 코드 1 로 끝난다(update.py 가 거기서 멈춘다).
 어디서 무엇을 받는지와 그 규칙은 프로젝트의 plan/specs/data-collection-policy.md 가 정한다(이 파일은 그것을 따른다).
 로그인·키가 필요한 출처는 쓰지 않는다.
@@ -46,6 +46,10 @@ NAVER = "https://m.stock.naver.com/api"
 # 국제결제은행(BIS)의 중앙은행 정책금리 묶음 파일. 한 줄이 한 나라, 열이 날짜다(1945년부터 3만 열, 압축해서 0.3MB).
 # 같은 자료를 주는 조회 주소(stats.bis.org/api)는 나라 둘에 5.6MB 가 와서 쓰지 않는다(2026-11-26 확인).
 BIS = "https://data.bis.org/static/bulk/WS_CBPOL_csv_col.zip"
+# BIS 의 소비자물가 묶음 파일. 한 줄이 (주기, 나라, 단위) 하나, 열이 달 또는 해다(1661년부터 1,730열, 압축해서 0.5MB).
+# 단위는 둘이다: 771 = 전년 같은 때 대비 %, 628 = 지수(2010 = 100). 부호만 믿지 않고 옆 칸의 글도 같이 본다(cpi).
+BIS_CPI = "https://data.bis.org/static/bulk/WS_LONG_CPI_csv_col.zip"
+CPI_YOY = ("771", "Year-on-year changes, in per cent")
 STOCKS = {k: a["code"] for k, a in ASSETS.items() if a["market"] == "kr" and a["kind"] == "stock"}
 KR = {k: a["code"] for k, a in ASSETS.items() if a["market"] == "kr"}
 US = {k: a["code"] for k, a in ASSETS.items() if a["market"] == "us"}
@@ -234,25 +238,32 @@ def now():
     print("naver_now", {k: round(v["shares"] / 1e8, 2) for k, v in out.items()}, "(억 주)")
 
 
+def bis_table(url, what):
+    """BIS 묶음 파일(zip 안에 CSV 하나)을 표로 읽는다. 한 줄이 한 계열이고 열이 날짜다."""
+    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=120)
+    if r.status_code != 200:
+        raise RuntimeError(f"BIS {what} 파일 상태 {r.status_code}")
+    z = zipfile.ZipFile(io.BytesIO(r.content))
+    return pd.read_csv(z.open(z.namelist()[0]), low_memory=False)
+
+
 def rates():
     """주요국 중앙은행 정책금리(일별, %). 국제결제은행(BIS)이 각국 중앙은행 값을 모아 내는 파일 하나를 받는다.
 
     일별(FREQ=D) 줄에서 assets.RATES 의 나라만 뽑아, 날짜를 줄로 돌려 bis_rates.csv 에 둔다.
+    주가(1994년부터)와 달리 BIS 가 가진 첫날부터 전부 받는다 - "30년으로는 부족하다"는 요청이 있었다.
+    가장 이른 나라는 1946-01-01(일본·영국·스위스·덴마크·인도), 미국은 1954-07-01 부터다(2026-11-26 확인).
     매번 전체를 다시 받는다 - 작고, BIS 가 과거 값을 고쳐 내면 그대로 따라간다.
     빈 날은 여기서 메우지 않는다. 주말·연휴는 나라마다 비어 있고 일본은 정책금리가 없던 몇 해가 통째로 비어 있어서,
     어디까지 이을지는 common.rate_steps 한 군데서 정한다. 나라마다 마지막 날도 다르다(2026-11-26 에 한국은 11-02, 미국은 11-17 까지 왔다).
     BIS 가 적어 둔 "이 나라는 무엇을 정책금리로 보는가"(COMPILATION, 영어)는 bis_rates_meta.json 에 따로 둔다 - 화면에 원문 그대로 보여 준다.
     """
-    r = requests.get(BIS, headers={"User-Agent": "Mozilla/5.0"}, timeout=120)
-    if r.status_code != 200:
-        raise RuntimeError(f"BIS 정책금리 파일 상태 {r.status_code}")
-    z = zipfile.ZipFile(io.BytesIO(r.content))
-    df = pd.read_csv(z.open(z.namelist()[0]), low_memory=False)
+    df = bis_table(BIS, "정책금리")
     df = df[df["FREQ"] == "D"].drop_duplicates("REF_AREA").set_index("REF_AREA")
     lost = [c for c in RATES if c not in df.index]
     if lost:  # 나라가 빠진 채 저장하면 화면에서 그 나라가 말없이 사라진다
         raise RuntimeError(f"BIS 파일에 일별 정책금리가 없는 나라: {lost}")
-    days = [c for c in df.columns if re.fullmatch(r"\d{4}-\d{2}-\d{2}", c) and c >= START.isoformat()]
+    days = [c for c in df.columns if re.fullmatch(r"\d{4}-\d{2}-\d{2}", c)]
     out = df.loc[list(RATES), days].T.apply(pd.to_numeric, errors="coerce").dropna(how="all")
     if len(out) < 1000:
         raise RuntimeError(f"BIS 정책금리가 {len(out)}일치만 왔다")
@@ -266,7 +277,35 @@ def rates():
           "가장 늦게 온 나라", ends.idxmin(), ends.min().date())
 
 
-JOBS = {f.__name__: f for f in (kr_price, us, flow, kospi_flow, now, rates)}
+def cpi():
+    """주요국 소비자물가 상승률(월별, 전년 같은 달 대비 %). 정책금리와 같은 곳(BIS)의 다른 묶음 파일 하나를 받는다.
+
+    월별(FREQ=M)·상승률(단위 771) 줄에서 assets.RATES 의 나라만 뽑아, 달(YYYY-MM)을 줄로 돌려 bis_cpi.csv 에 둔다.
+    정책금리와 나라 목록을 같이 쓴다 - 탭 4 가 같은 나라의 금리와 물가를 위아래로 그린다.
+    매번 전체를 다시 받는다 - 작고, 물가는 뒤에 고쳐 발표되는 값이라 BIS 가 고치면 그대로 따라간다.
+    빈 달은 메우지 않는다. 미국 2025-10 은 값이 없고, 스웨덴·홍콩의 옛 자료는 석 달에 한 값만 있다(2026-11-26 확인).
+    호주·뉴질랜드는 분기에 한 번 나오는 값이 석 달 동안 같은 값으로 들어 있다 - BIS 파일이 그렇게 온다.
+    """
+    df = bis_table(BIS_CPI, "소비자물가")
+    df = df[(df["FREQ"] == "M") & (df["UNIT_MEASURE"].astype(str) == CPI_YOY[0])]
+    odd = sorted(set(df["Unit of measure"]) - {CPI_YOY[1]})
+    if odd:  # 부호의 뜻이 바뀌면 지수(100 안팎)를 상승률로 그리게 된다
+        raise RuntimeError(f"BIS 소비자물가의 단위 {CPI_YOY[0]} 이 상승률이 아니다: {odd}")
+    df = df.drop_duplicates("REF_AREA").set_index("REF_AREA")
+    lost = [c for c in RATES if c not in df.index]
+    if lost:  # 나라가 빠진 채 저장하면 화면에서 그 나라의 물가 선이 말없이 사라진다
+        raise RuntimeError(f"BIS 파일에 월별 소비자물가 상승률이 없는 나라: {lost}")
+    months = [c for c in df.columns if re.fullmatch(r"\d{4}-\d{2}", c)]
+    out = df.loc[list(RATES), months].T.apply(pd.to_numeric, errors="coerce").dropna(how="all")
+    if len(out) < 240:
+        raise RuntimeError(f"BIS 소비자물가가 {len(out)}달치만 왔다")
+    out.index.name = "month"
+    out.to_csv(OUT / "bis_cpi.csv", encoding="utf-8-sig")
+    ends = out.apply(lambda s: s.last_valid_index())
+    print("bis_cpi", len(out), out.index.min(), "~", out.index.max(), f"({len(RATES)}개 나라)", "가장 늦게 온 나라", ends.idxmin(), ends.min())
+
+
+JOBS = {f.__name__: f for f in (kr_price, us, flow, kospi_flow, now, rates, cpi)}
 if __name__ == "__main__":  # 테스트가 이 파일을 불러올 때는 받지 않는다
     if "--today" in sys.argv and datetime.now().strftime("%H:%M") < "15:40":
         # 장중 가격이 오늘 종가인 것처럼 저장된다. 15:30 마감 뒤 종가가 올라올 틈을 두고 받는다

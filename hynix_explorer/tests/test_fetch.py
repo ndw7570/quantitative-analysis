@@ -267,11 +267,11 @@ class Rates(Base):
             ("D", "DE", "목록에 없는 나라", lambda d: 9.0),
             ("D", "KR", None, lambda d: 4.0 if d >= pd.Timestamp("1995-01-02") and d.dayofweek < 5 else None)]
 
-    def test_keeps_daily_rows_of_listed_countries_from_the_start_day(self):
+    def test_keeps_daily_rows_of_listed_countries_from_the_first_day_in_the_file(self):
         self.run_rates(self.zip(self.ROWS))
         got = self.saved("bis_rates.csv")
         self.assertEqual(list(got.columns), ["US", "KR"])
-        self.assertEqual(got.index.min(), pd.Timestamp("1994-01-03"))  # 1994-01-01 은 토요일. 그 앞(1993년)은 받지 않는다
+        self.assertEqual(got.index.min(), pd.Timestamp("1993-12-28"))  # 주가의 시작일(1994년)로 자르지 않는다. 파일의 첫날부터 받는다
         self.assertTrue((got.index.dayofweek < 5).all())               # 두 나라 다 빈 날은 줄을 만들지 않는다
         self.assertEqual(got["US"].unique().tolist(), [5.0])
         self.assertTrue(pd.isna(got.loc["1994-06-01", "KR"]))          # 빈 값을 여기서 메우지 않는다(common.rate_steps 가 정한다)
@@ -300,6 +300,74 @@ class Rates(Base):
         last = pd.Timestamp("1994-03-01")  # 값이 두 달치만 든 파일(잘려서 온 경우)
         with self.assertRaises(RuntimeError):
             self.run_rates(self.zip([(f_, a, n, (lambda d, v=v: v(d) if d < last else None)) for f_, a, n, v in self.ROWS]))
+        self.assertEqual(f.read_text(encoding="utf-8"), "멀쩡한 파일")
+
+
+class Cpi(Base):
+    """BIS 소비자물가 묶음 파일에서 월별 상승률 줄만 뽑는지. 한 줄이 (주기, 나라, 단위) 하나, 열이 달이다(2026-11-26 에 받은 파일의 모양)."""
+    MONTHS = pd.period_range("1990-01", "2012-12", freq="M").strftime("%Y-%m")
+    YOY = "Year-on-year changes, in per cent"
+
+    def zip(self, rows):
+        df = pd.DataFrame([{"FREQ": f, "REF_AREA": a, "UNIT_MEASURE": u, "Unit of measure": text,
+                            "1989": 9.9, **{m: v(m) for m in self.MONTHS}} for f, a, u, text, v in rows])
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr("WS_LONG_CPI_csv_col.csv", df.to_csv(index=False))
+        return buf.getvalue()
+
+    def run_cpi(self, body, status=200):
+        resp = mock.Mock(status_code=status, content=body)
+        with mock.patch.object(fetch, "RATES", {"US": ("미국", "주요"), "KR": ("한국", "주요")}), \
+                mock.patch.object(fetch.requests, "get", lambda *a, **kw: resp):
+            fetch.cpi()
+
+    ROWS = [("M", "US", 628, "Index, 2010 = 100", lambda m: 100.0),            # 같은 나라의 지수 줄이 먼저 와도 읽지 않는다
+            ("A", "US", 771, YOY, lambda m: 7.0),                              # 연간 줄도 읽지 않는다
+            ("M", "US", 771, YOY, lambda m: None if m == "2000-05" else 3.0),
+            ("M", "DE", 771, YOY, lambda m: 9.0),                              # 목록에 없는 나라
+            ("M", "KR", 771, YOY, lambda m: 4.0 if m >= "1995-01" else None)]
+
+    def saved_months(self):
+        return pd.read_csv(self.out / "bis_cpi.csv", index_col=0, encoding="utf-8-sig")
+
+    def test_keeps_monthly_yoy_rows_of_listed_countries(self):
+        self.run_cpi(self.zip(self.ROWS))
+        got = self.saved_months()
+        self.assertEqual(list(got.columns), ["US", "KR"])
+        self.assertEqual((got.index[0], got.index[-1], len(got)), ("1990-01", "2012-12", len(self.MONTHS)))  # 해("1989") 열은 달이 아니다
+        self.assertEqual(sorted(got["US"].dropna().unique()), [3.0])
+        self.assertTrue(pd.isna(got.loc["2000-05", "US"]))   # 빈 달을 메우지 않는다
+        self.assertTrue(pd.isna(got.loc["1994-12", "KR"]))
+        self.assertEqual(got.loc["1995-01", "KR"], 4.0)
+
+    def test_missing_country_raises_and_keeps_the_file(self):
+        f = self.out / "bis_cpi.csv"
+        f.write_text("멀쩡한 파일", encoding="utf-8")
+        with self.assertRaises(RuntimeError):
+            self.run_cpi(self.zip([r for r in self.ROWS if r[1] != "KR"]))
+        self.assertEqual(f.read_text(encoding="utf-8"), "멀쩡한 파일")
+
+    def test_error_status_raises_and_keeps_the_file(self):
+        f = self.out / "bis_cpi.csv"
+        f.write_text("멀쩡한 파일", encoding="utf-8")
+        with self.assertRaises(RuntimeError):
+            self.run_cpi(b"", status=503)
+        self.assertEqual(f.read_text(encoding="utf-8"), "멀쩡한 파일")
+
+    def test_unit_code_that_no_longer_means_yoy_raises_and_keeps_the_file(self):
+        # 부호 771 의 뜻이 바뀌면 지수(100 안팎)를 상승률로 그리게 된다
+        f = self.out / "bis_cpi.csv"
+        f.write_text("멀쩡한 파일", encoding="utf-8")
+        with self.assertRaises(RuntimeError):
+            self.run_cpi(self.zip([(fr, a, u, "Index, 2010 = 100" if u == 771 else t, v) for fr, a, u, t, v in self.ROWS]))
+        self.assertEqual(f.read_text(encoding="utf-8"), "멀쩡한 파일")
+
+    def test_too_few_months_raises_and_keeps_the_file(self):
+        f = self.out / "bis_cpi.csv"
+        f.write_text("멀쩡한 파일", encoding="utf-8")
+        with self.assertRaises(RuntimeError):
+            self.run_cpi(self.zip([(fr, a, u, t, (lambda m, v=v: v(m) if m < "1991-01" else None)) for fr, a, u, t, v in self.ROWS]))
         self.assertEqual(f.read_text(encoding="utf-8"), "멀쩡한 파일")
 
 
