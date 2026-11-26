@@ -26,8 +26,8 @@ BROWSERS = [r"C:\Program Files\Google\Chrome\Application\chrome.exe",
             r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
             r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"]
 # 처음 열었을 때 그려지는 차트 수. 화면 구성을 바꾸면 같이 고친다.
-# 탭 1 이 15개(2026-11-25 에 센 값), 탭 3 이 1개, 탭 4 가 2개(정책금리, 소비자물가. 숨겨진 채로도 한 번 그린다 - template.html 의 yearRender, rateRender).
-MIN_CHARTS = 18
+# 탭 1 이 15개(2026-11-25 에 센 값), 탭 3 이 1개, 탭 4 가 1개(정책금리와 소비자물가를 한 차트에. 숨겨진 채로도 한 번 그린다 - template.html 의 yearRender, rateRender).
+MIN_CHARTS = 17
 # 탭 3 의 한 해 수익률이 이 범위를 벗어나면 단위가 바뀌었거나 지수 기준이 중간에 달라진 것으로 본다.
 # 받은 자료의 최고는 코스닥 1999년 +240.7%, 최저는 코스닥 2000년 -79.5% 다(2026-11-26 확인).
 YEAR_RANGE = (-90, 400)
