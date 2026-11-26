@@ -10,6 +10,7 @@ import io
 import math
 import tempfile
 import unittest
+import zipfile
 from datetime import date
 from pathlib import Path
 from unittest import mock
@@ -232,6 +233,65 @@ class KospiFlow(Base):
             self.run_job(fetch.kospi_flow, self, date(2026, 11, 24))
         self.assertNotIn("20261124", self.calls)
         self.assertNotIn(pd.Timestamp("2026-11-24"), self.saved("naver_flow_kospi.csv").index)
+
+
+class Rates(Base):
+    """BIS 묶음 파일에서 필요한 줄과 날짜만 뽑는지. 파일은 한 줄이 한 나라, 열이 날짜다(2026-11-26 에 받은 파일의 모양)."""
+    DAYS = pd.date_range("1993-12-28", "1997-12-31")
+
+    def zip(self, rows):
+        df = pd.DataFrame([{"FREQ": f, "REF_AREA": a, "COMPILATION": note,
+                            **{d.strftime("%Y-%m-%d"): v(d) for d in self.DAYS}} for f, a, note, v in rows])
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr("WS_CBPOL_csv_col.csv", df.to_csv(index=False))
+        return buf.getvalue()
+
+    def run_rates(self, body, status=200):
+        resp = mock.Mock(status_code=status, content=body)
+        with mock.patch.object(fetch, "RATES", {"US": ("미국", "주요"), "KR": ("한국", "주요")}), \
+                mock.patch.object(fetch.requests, "get", lambda *a, **kw: resp):
+            fetch.rates()
+
+    ROWS = [("M", "US", "월별 줄", lambda d: 1.0),                                   # 같은 나라의 월별 줄이 먼저 와도 읽지 않는다
+            ("D", "US", "mid-point of the target", lambda d: 5.0 if d.dayofweek < 5 else None),
+            ("D", "DE", "목록에 없는 나라", lambda d: 9.0),
+            ("D", "KR", None, lambda d: 4.0 if d >= pd.Timestamp("1995-01-02") and d.dayofweek < 5 else None)]
+
+    def test_keeps_daily_rows_of_listed_countries_from_the_start_day(self):
+        self.run_rates(self.zip(self.ROWS))
+        got = self.saved("bis_rates.csv")
+        self.assertEqual(list(got.columns), ["US", "KR"])
+        self.assertEqual(got.index.min(), pd.Timestamp("1994-01-03"))  # 1994-01-01 은 토요일. 그 앞(1993년)은 받지 않는다
+        self.assertTrue((got.index.dayofweek < 5).all())               # 두 나라 다 빈 날은 줄을 만들지 않는다
+        self.assertEqual(got["US"].unique().tolist(), [5.0])
+        self.assertTrue(pd.isna(got.loc["1994-06-01", "KR"]))          # 빈 값을 여기서 메우지 않는다(common.rate_steps 가 정한다)
+        self.assertEqual(got.loc["1995-01-02", "KR"], 4.0)
+        import json
+        self.assertEqual(json.loads((self.out / "bis_rates_meta.json").read_text(encoding="utf-8")),
+                         {"US": "mid-point of the target", "KR": ""})
+
+    def test_missing_country_raises_and_keeps_the_file(self):
+        f = self.out / "bis_rates.csv"
+        f.write_text("멀쩡한 파일", encoding="utf-8")
+        with self.assertRaises(RuntimeError):
+            self.run_rates(self.zip([r for r in self.ROWS if (r[0], r[1]) != ("D", "KR")]))
+        self.assertEqual(f.read_text(encoding="utf-8"), "멀쩡한 파일")
+
+    def test_error_status_raises_and_keeps_the_file(self):
+        f = self.out / "bis_rates.csv"
+        f.write_text("멀쩡한 파일", encoding="utf-8")
+        with self.assertRaises(RuntimeError):
+            self.run_rates(b"", status=503)
+        self.assertEqual(f.read_text(encoding="utf-8"), "멀쩡한 파일")
+
+    def test_too_few_days_raises_and_keeps_the_file(self):
+        f = self.out / "bis_rates.csv"
+        f.write_text("멀쩡한 파일", encoding="utf-8")
+        last = pd.Timestamp("1994-03-01")  # 값이 두 달치만 든 파일(잘려서 온 경우)
+        with self.assertRaises(RuntimeError):
+            self.run_rates(self.zip([(f_, a, n, (lambda d, v=v: v(d) if d < last else None)) for f_, a, n, v in self.ROWS]))
+        self.assertEqual(f.read_text(encoding="utf-8"), "멀쩡한 파일")
 
 
 if __name__ == "__main__":

@@ -15,8 +15,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from assets import ASSETS
-from common import D, prices, us, year_paths
+from assets import ASSETS, RATES
+from common import D, prices, rate_data, us, year_paths
 
 FLOW_FROM = pd.Timestamp("2005-01-03")  # 네이버 증권의 투자자별 수급이 시작되는 날
 SHOW_FROM = "1997-01-01"
@@ -26,8 +26,9 @@ BROWSERS = [r"C:\Program Files\Google\Chrome\Application\chrome.exe",
             r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
             r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"]
 # 처음 열었을 때 그려지는 차트 수. 화면 구성을 바꾸면 같이 고친다.
-# 탭 1 이 15개(2026-11-25 에 센 값), 탭 3 이 1개(숨겨진 채로도 한 번 그린다 - template.html 의 yearRender).
-MIN_CHARTS = 16
+# 탭 1 이 15개(2026-11-25 에 센 값), 탭 3 과 탭 4 가 1개씩(숨겨진 채로도 한 번 그린다 - template.html 의 yearRender, rateRender).
+MIN_CHARTS = 17
+RATE_LATE = 45  # 정책금리가 이 날수 넘게 뒤처진 나라는 알린다. BIS 는 나라마다 며칠에서 몇 주 늦게 싣는다
 errors = []
 
 
@@ -144,6 +145,25 @@ def check_data():
         warn(f"미국 가격이 한국 가격보다 {gap}일 뒤처져 있다")
 
 
+def check_rates():
+    """탭 4 의 정책금리. 값이 틀려도 화면은 멀쩡히 그려지므로 범위와 날짜를 본다."""
+    if not (D / "bis_rates.csv").exists():
+        err("bis_rates.csv 가 없다(fetch.py rates 로 받는다)")
+        return
+    r = rate_data()
+    for c, (name, _) in RATES.items():
+        a = r["areas"].get(c)
+        if a is None:
+            err(f"정책금리 {name}: {r['start']} 뒤로 값이 하나도 없다")
+            continue
+        vals = [v for _, v in a["steps"] if v is not None]
+        if min(vals) < -5 or max(vals) > 300:  # 받은 자료의 최고는 러시아 200%(1990년대), 최저는 스위스·덴마크 -0.75%
+            err(f"정책금리 {name}: 값이 {min(vals)} ~ {max(vals)} % 다(단위가 바뀌었거나 다른 줄을 읽었다)")
+        late = (pd.Timestamp(r["end"]) - pd.Timestamp(a["last"])).days
+        if late > RATE_LATE:
+            warn(f"정책금리 {name}: {a['last']} 까지만 왔다(가장 늦게까지 온 나라는 {r['end']}). 그 뒤에 바뀐 금리는 화면에 없다")
+
+
 def check_html(path):
     path = Path(path).resolve()
     html = path.read_text(encoding="utf-8")
@@ -161,6 +181,9 @@ def check_html(path):
     mark3 = "const SPX = "
     if mark3 not in html or json.JSONDecoder().raw_decode(html, html.index(mark3) + len(mark3))[0] != year_paths(us("spx")):
         err("HTML 에 든 S&P500 연도별 값(탭 3)이 data/yf_spx.csv 로 다시 계산한 값과 다르다")
+    mark4 = "const RATES = "
+    if mark4 not in html or json.JSONDecoder().raw_decode(html, html.index(mark4) + len(mark4))[0] != rate_data():
+        err("HTML 에 든 정책금리(탭 4)가 data/bis_rates.csv 로 다시 계산한 값과 다르다")
     if not errors:
         print("HTML 에 든 값이 data/ 와 같다:", len(ALL), "대상,", ALL["kospi"]["R"]["series"]["date"][-1], "까지")
 
@@ -189,5 +212,6 @@ if __name__ == "__main__":
         check_html(sys.argv[2])
     else:
         check_data()
+        check_rates()
     print(f"검사 끝: 오류 {len(errors)}건")
     sys.exit(1 if errors else 0)

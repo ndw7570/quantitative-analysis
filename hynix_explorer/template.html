@@ -52,11 +52,16 @@ button:disabled{opacity:.4;cursor:default}
 .legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
 .legend i.box{height:10px;width:10px}
 .legend i.dot{height:8px;width:8px;border-radius:50%}
-.ychips{display:flex;flex-wrap:wrap;gap:4px;margin:8px 0 0}
-.ychips button{padding:2px 8px;font-size:13px;color:var(--ink2);border-color:var(--border)}
-.ychips button[aria-pressed=true]{color:var(--ink);border-color:var(--ink2);font-weight:650}
-.ychips button.mid{text-decoration:underline dotted;text-underline-offset:3px}
-.ychips button i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle}
+/* 꼬리표: 드롭다운에서 고른 것만 줄지어 보여 준다(탭 3 의 해, 탭 4 의 나라). 누르면 빠진다 */
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0 0;min-height:30px}
+.chips button{display:inline-flex;align-items:center;gap:6px;padding:2px 7px 2px 10px;font-size:13px;border-radius:999px}
+.chips button:hover{border-color:var(--ink2)}
+.chips button i{width:8px;height:8px;border-radius:50%}
+.chips button.mid span{text-decoration:underline dotted;text-underline-offset:3px}
+.chips button b{color:var(--muted);font-weight:400;font-size:15px;line-height:1}
+.chips button:hover b{color:var(--ink)}
+.chips small,.hint{color:var(--muted);font-size:13px}
+.hint{margin:6px 0 0}
 .tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--border);border-radius:8px;
   box-shadow:0 4px 16px rgba(0,0,0,.14);padding:7px 9px;font-size:12px;line-height:1.5;white-space:nowrap;display:none;z-index:5}
 .tip b{display:block}
@@ -105,6 +110,7 @@ td small,th small{color:var(--muted);font-weight:400}
   <button role="tab" data-tab="explore">기간 비교</button>
   <button role="tab" data-tab="sig">극단값 신호표</button>
   <button role="tab" data-tab="year">여러 해 겹쳐 보기</button>
+  <button role="tab" data-tab="rate">주요국 정책금리</button>
 </div>
 
 <div id="tab_explore">
@@ -199,12 +205,13 @@ td small,th small{color:var(--muted);font-weight:400}
   <h2>S&amp;P500 여러 해 겹쳐 보기 - 연초부터의 수익률</h2>
   <p class="sub">방송 화면의 차트("트럼프 1기 vs 2기 중간선거", 2018년과 2026년)에서 출발했습니다. 올해(검은 선)와 고른 해를 "전년 마지막 종가 = 0%"로 맞춰 같은 달력 날짜에 포갭니다. 묻는 것은 하나입니다: <b>올해가 그 해와 얼마나 같은 길을 왔고, 그 해는 이 날짜 뒤에 어떻게 됐는가.</b></p>
   <div class="ctrl">
-    <label>이어 볼 햇수 <select id="y_n" style="font-weight:650"></select></label>
+    <label>비교할 해 <select id="y_add" style="font-weight:650"></select></label>
+    <label>이어 볼 햇수 <select id="y_n"></select></label>
     <button id="y_all">전체 겹치기</button><button id="y_mid">중간선거 해만</button><button id="y_none">모두 빼기</button>
     <label id="y_cnt"></label>
   </div>
-  <div class="ctrl" style="margin-top:8px"><label>비교할 해 - 누르면 겹치고 다시 누르면 뺍니다. 개수 제한은 없습니다. 밑줄은 중간선거가 있는 해</label></div>
-  <div class="ychips" id="y_years"></div>
+  <div class="chips" id="y_chips"></div>
+  <p class="hint">목록에서 해를 고르면 꼬리표가 붙고 차트에 겹칩니다. 꼬리표를 누르면 빠집니다. 개수 제한은 없습니다. 밑줄은 중간선거가 있는 해입니다.</p>
   <div class="ctitle" id="y_title"></div>
   <div id="y_chart"></div>
   <div class="tw" style="margin-top:10px"><table id="y_table"></table></div>
@@ -213,13 +220,49 @@ td small,th small{color:var(--muted);font-weight:400}
   <h2>읽는 법과 한계</h2>
   <ul>
     <li><b>닮은 해 하나는 표본 1개입니다.</b> 비교할 해를 바꿔 가며 보세요. 어느 해와 포개도 비슷한 구간은 나옵니다. 1951년 이후 74개 해를 올해와의 평균 거리로 줄 세우면 2018년은 16번째였습니다(2026-11-25 기준, 이 화면 밖에서 따로 계산한 값이라 날이 지나면 달라집니다).</li>
-    <li><b>비교할 해</b>는 개수 제한 없이 겹칩니다. 하나씩 누른 해는 7개까지 색을 받고, 그 색은 그 해를 뺄 때까지 그대로입니다. 그 뒤로 누른 해와 "전체 겹치기"로 한꺼번에 넣은 해는 <b>회색 선</b>입니다(색이 7개를 넘으면 서로 구별이 안 됩니다). 회색 선의 값은 마우스를 올리면 묶어서(중앙값과 최저 ~ 최고), 해마다는 아래 표에서 봅니다. 회색 선에 색을 주려면 그 해를 뺐다가 다시 누르세요.</li>
+    <li><b>비교할 해</b>는 개수 제한 없이 겹칩니다. 목록에서 하나씩 고른 해는 7개까지 색을 받고, 그 색은 그 해를 뺄 때까지 그대로입니다. 그 뒤로 고른 해와 "전체 겹치기"로 한꺼번에 넣은 해는 <b>회색 선</b>입니다(색이 7개를 넘으면 서로 구별이 안 됩니다). 회색 선의 값은 마우스를 올리면 묶어서(중앙값과 최저 ~ 최고), 해마다는 아래 표에서 봅니다. 회색 선에 색을 주려면 그 해의 꼬리표를 눌러 뺐다가 목록에서 다시 고르세요(남는 색이 있어야 합니다).</li>
     <li><b>이어 볼 햇수</b>를 2년 이상으로 하면 고른 해부터 그만큼을 한 선으로 잇습니다(2018년, 3년 -> 2018~2020년). 0%는 시작 해의 전년 마지막 종가입니다. 가로축의 "2년차"는 선마다 다른 해입니다(2018년 선은 2019년, 올해 선은 내년). 검은 선은 자료가 있는 날에서 끝납니다.</li>
     <li><b>세로선</b>은 미국 중간선거일(11월 첫 월요일 다음 날)입니다. 선에 중간선거가 있는 해(4년마다)가 들어 있을 때만 긋습니다. 겹친 해가 다섯 개 이상이면 선 대신 그 날짜들의 범위를 띠로 표시합니다. 선거 결과와 정책은 이 자료에 없습니다 - 날짜만 표시합니다.</li>
     <li><b>날짜 맞춤</b>: 달력 날짜로 맞춥니다. 장이 쉰 날은 직전 종가를 이어 그리고, 2월 29일은 칸이 없습니다. 그래서 표의 "저점·고점 날짜"는 그 값이 처음 나온 날입니다.</li>
     <li><b>자료</b>: 야후 파이낸스의 S&amp;P500 종가(미국 달력 그대로, 배당 제외), 1995년부터. 탭 1·2 의 값과 달리 한국 달력에 얹지 않았습니다.</li>
     <li>표의 "그 뒤 ...까지"는 기준 날짜(올해 자료의 마지막 날짜) 종가에서 그 선의 마지막 종가까지의 수익률입니다. 올해는 아직 값이 없습니다.</li>
   </ul>
+</div>
+</div>
+
+<div id="tab_rate" hidden>
+<div class="card">
+  <h2>주요국 정책금리 겹쳐 보기 - 1995년부터</h2>
+  <p class="sub">정책금리(중앙은행이 정하는 기준이 되는 금리. 한국은 한국은행 "기준금리", 미국은 연준의 "연방기금금리 목표")를 나라끼리 같은 날짜에 포갭니다. 묻는 것은 하나입니다: <b>누가 먼저 올리고 내렸고, 지금 나라 사이의 차이는 얼마인가.</b> 나라 <span id="r_n"></span>개 · 자료 <span id="r_range"></span> · 국제결제은행(BIS)</p>
+  <div class="ctrl">
+    <label>나라 <select id="r_add" style="font-weight:650"></select></label>
+    <label>기간 <select id="r_span"></select></label>
+    <label>세로축 <select id="r_cap"></select></label>
+    <button id="r_main">주요 6개</button><button id="r_all">전체 겹치기</button><button id="r_none">모두 빼기</button>
+    <label id="r_cnt"></label>
+  </div>
+  <div class="chips" id="r_chips"></div>
+  <p class="hint">목록에서 나라를 고르면 꼬리표가 붙고 차트에 겹칩니다. 꼬리표를 누르면 빠집니다. 개수 제한은 없습니다.</p>
+  <div class="ctitle" id="r_title"></div>
+  <div id="r_chart"></div>
+  <div class="tw" style="margin-top:10px"><table id="r_table"></table></div>
+</div>
+<div class="card">
+  <h2>읽는 법과 한계</h2>
+  <ul>
+    <li><b>정책금리는 시장 금리가 아닙니다.</b> 국채 금리나 대출 금리처럼 시장에서 매일 움직이는 값이 아니라 중앙은행이 회의에서 정하는 값이라 계단 모양입니다. 무엇을 정책금리로 치는지는 나라마다 다르고 중간에 바뀌기도 합니다. 이 화면은 BIS 가 나라마다 한 줄로 이어 놓은 값을 그대로 씁니다(맨 아래 "BIS 원문").</li>
+    <li><b>미국</b>은 목표 범위의 가운데 값입니다. 연준이 3.75 ~ 4.00%로 정하면 여기에는 3.875%로 나옵니다.</li>
+    <li><b>한국</b>은 1999-05-06 부터입니다(그 전은 BIS 일별 자료에 없습니다). 2008-03-06 까지는 콜금리 목표, 그 뒤는 한국은행 기준금리입니다.</li>
+    <li><b>유로존</b>은 1999년부터이고, 2024-09-18 부터는 기준이 예금금리(은행이 중앙은행에 돈을 맡기고 받는 금리)로 바뀌었습니다. <b>중국</b>은 2019-08-20 부터 1년 대출우대금리(LPR)입니다. 기준이 바뀐 날의 앞과 뒤는 같은 금리가 아닙니다.</li>
+    <li><b>선이 끊긴 곳</b>은 값이 31일 넘게 빈 기간입니다. 주말·연휴처럼 짧게 빈 곳만 직전 값으로 잇습니다. 일본이 세 번 끊깁니다(1999-02 ~ 2000-08, 2001-03 ~ 2006-03, 2013-04 ~ 2016-09). BIS 는 세 번째를 "정책금리 없음"으로 적어 두었고, 앞의 두 번은 값이 비어 있다는 것만 확인했습니다.</li>
+    <li><b>선이 끝나는 날이 나라마다 다릅니다.</b> BIS 가 나라마다 며칠에서 몇 주 늦게 싣습니다(표의 "자료 마지막 날"). 그 뒤는 그리지 않습니다 - 그 사이에 금리가 바뀌었을 수 있습니다.</li>
+    <li><b>세로축은 고른 나라에 맞춰집니다.</b> 브라질·러시아·튀르키예처럼 금리가 수십 %였던 나라를 넣으면 나머지 나라의 선이 바닥에 붙습니다. 그럴 때는 "세로축"을 20%까지나 10%까지로 바꾸세요. 넘는 선은 위로 나가 잘리고, 값은 표와 마우스를 올린 자리에 그대로 나옵니다.</li>
+    <li><b>색</b>은 탭 3 과 같습니다. 목록에서 하나씩 고른 나라는 7개까지 색을 받고, 그 뒤로 고른 나라와 "전체 겹치기"로 넣은 나라는 회색 선입니다. 회색 선의 값은 마우스를 올리면 묶어서(중앙값, 가장 낮은 나라와 높은 나라), 나라마다는 아래 표에서 봅니다.</li>
+    <li><b>물가를 빼지 않은 금리입니다.</b> 금리 10%인 나라가 2%인 나라보다 돈줄을 더 죄고 있다고 이 차트만으로는 말할 수 없습니다. 물가 상승률 자료는 여기 없습니다.</li>
+    <li>표의 <b>%p</b>(퍼센트포인트)는 금리끼리의 차이입니다. 3.00%가 3.50%가 되면 +0.50%p 입니다. "1년 전보다"는 그 나라 자료의 마지막 날에서 365일 전 값과 견준 것입니다.</li>
+    <li><b>자료</b>: 국제결제은행(BIS)의 중앙은행 정책금리, 하루 단위. BIS 에 일별 자료가 있는 49줄 가운데 26개 나라를 골랐습니다(유로화를 쓰기 전의 나라별 자료, 2025-07 에서 멈춘 아르헨티나 등은 뺐습니다).</li>
+  </ul>
+  <details><summary>나라마다 무엇을 정책금리로 치는가 (BIS 원문, 영어)</summary><div class="tw"><table id="r_notes"></table></div></details>
 </div>
 </div>
 </main>
@@ -232,6 +275,7 @@ td small,th small{color:var(--muted);font-weight:400}
 
 <script>
 const ALL = __DATA__, KEYS = Object.keys(ALL);   // {대상: {R: 탭 1 자료, G: 탭 2 자료}}
+const RATES = __RATES__;   // 탭 4 자료: {start, end, areas: {나라 부호: {name, group, note, last: 자료 마지막 날, steps: [[바뀐 날, 값 %]]}}} (common.py 의 rate_data)
 const SPX = __SPX__;   // 탭 3 자료: {end: 마지막 날, days: 달력 칸 366개, years: {해: 칸마다 연초부터의 수익률 %}} (common.py 의 year_paths)
 // 날짜 목록은 모든 대상이 같다(build.py 가 확인한다). 날짜만 볼 때는 이 S 를 쓰고, 값은 각 창이 고른 대상에서 읽는다.
 const R = ALL[KEYS[0]].R, S = R.series, N = S.date.length;
@@ -286,8 +330,8 @@ function niceTicks(lo, hi, n) {
 }
 
 /* 한 창의 한 차트. 모든 배열은 창 기준(0..n-1)으로 잘라서 받는다.
-   cfg: {dates, lines:[{name,short,color,vals:[arr,..],fmt,w,noEnd,op,quiet}], extraLegend:[{color,name}], points:{vals,flags,name,flagName},
-         strips:[{name,vals,map}], vlines:[{i,label,left}], bands:[{a,b,label,left}], extraTip, fmt, zero, log, h, onBrush,
+   cfg: {dates, lines:[{name,short,color,vals:[arr,..],fmt,w,noEnd,op,quiet,step}], extraLegend:[{color,name}], points:{vals,flags,name,flagName},
+         strips:[{name,vals,map}], vlines:[{i,label,left}], bands:[{a,b,label,left}], extraTip, fmt, zero, log, h, onBrush, ymax,
          xticks:[{i,label}] - 주면 가로축 눈금을 날짜에서 뽑지 않고 이것을 쓴다(탭 3 은 dates 가 연-월-일이 아니다)} */
 function chart(host, cfg) {
   host.innerHTML = ''; host.className = 'chart';
@@ -313,6 +357,10 @@ function chart(host, cfg) {
   lines.forEach(l => l.vals.forEach(a => a.forEach(see)));
   if (cfg.points) cfg.points.vals.forEach(see);
   if (lo > hi) { host.className = 'gap'; host.textContent = '이 기간에는 값이 없습니다.'; return {setSel() {}}; }
+  // ymax: 세로축을 여기까지만 그린다(탭 4 - 금리가 수십 %였던 나라 하나가 나머지 선을 바닥에 붙인다). 넘는 선은 위로 나가 잘린다.
+  // 값을 ymax 로 눌러 그리면 그 높이에 머문 것처럼 보이므로 누르지 않고 그림만 자른다. 툴팁은 원래 값을 보여 준다.
+  let clip = null;
+  if (cfg.ymax != null && hi > cfg.ymax) { hi = cfg.ymax; lo = Math.min(lo, hi); clip = 'clip' + (chart.seq = (chart.seq || 0) + 1); }
   if (cfg.zero) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
   if (lo === hi) { lo -= 1; hi += 1; }
   let tlo = T(lo), thi = T(hi); const pad = (thi - tlo) * 0.06; tlo -= pad; thi += pad;
@@ -371,14 +419,24 @@ function chart(host, cfg) {
     p.vals.forEach((v, i) => { if (v == null) return; const f = p.flags[i];
       el('circle', {cx: x(i), cy: y(v), r: f ? r0 + 1.2 : r0, fill: `var(${f ? '--crit' : '--muted'})`}, svg); });
   }
+  if (clip) el('rect', {x: m.l, y: m.t, width: pw, height: ph + 1}, el('clipPath', {id: clip}, svg));
   const ends = [];
   // quiet: 배경으로 까는 선(탭 3 의 회색 선). 먼저 그려 밑에 깔고 범례·툴팁·끝 이름표에서 뺀다. 수십 개가 한꺼번에 오기 때문이다.
   [...lines.filter(l => l.quiet), ...lines.filter(l => !l.quiet)].forEach(l => l.vals.forEach((arr, ki) => {
     let d = '', pen = false, last = null;
-    arr.forEach((v, i) => { if (v == null) return; d += (pen ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1); pen = true; last = v; });
-    if (!pen) return;
-    el('path', {d, fill: 'none', stroke: `var(${l.color})`, 'stroke-width': l.w || 1.8, 'stroke-opacity': l.op || 1, 'stroke-linejoin': 'round', 'stroke-linecap': 'round'}, svg);
-    if (ki === 0 && !l.noEnd && !l.quiet && !cfg.noEndPad && lines.length > 1) ends.push({y: y(last), name: l.short || l.name, color: l.color});
+    arr.forEach((v, i) => {
+      // step: 계단 선(탭 4 의 정책금리). 빈 곳에서 선을 끊는다 - 정책금리가 없던 기간을 이으면 없던 금리를 그리게 된다. 다른 차트는 빈 곳을 건너 잇는다.
+      if (v == null) { if (l.step) pen = false; return; }
+      if (l.step && pen) {
+        if (v === last && arr[i + 1] === v) return;  // 평평한 구간의 가운데 점은 뺀다. 하루 칸 1만 개짜리 선에 꺾이는 점만 남는다
+        if (v !== last) d += 'L' + x(i).toFixed(1) + ' ' + y(last).toFixed(1);  // 바뀐 날에 수직으로 꺾는다(비스듬히 이으면 하루 만에 바뀐 것이 서서히 바뀐 것처럼 보인다)
+      }
+      d += (pen ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1); pen = true; last = v;
+    });
+    if (!d) return;
+    const pth = el('path', {d, fill: 'none', stroke: `var(${l.color})`, 'stroke-width': l.w || 1.8, 'stroke-opacity': l.op || 1, 'stroke-linejoin': 'round', 'stroke-linecap': 'round'}, svg);
+    if (clip) pth.setAttribute('clip-path', `url(#${clip})`);
+    if (ki === 0 && !l.noEnd && !l.quiet && !cfg.noEndPad && lines.length > 1) ends.push({y: Math.max(m.t, y(last)), name: l.short || l.name, color: l.color});
   }));
   ends.sort((a, b) => a.y - b.y);
   ends.forEach((e, i) => { if (i && e.y - ends[i - 1].y < 13) e.y = ends[i - 1].y + 13; });
@@ -748,17 +806,44 @@ gui('g_last').onclick = () => { gT = GN - 1; sigRender(); };
 gui('g_peak').onclick = () => { gT = G.close.indexOf(Math.max(...G.close)); sigRender(); };
 gui('g_q').onchange = gui('g_basis').onchange = sigRender;
 
+// ---------- 고르기: 드롭다운 + 꼬리표 (탭 3 의 해, 탭 4 의 나라가 같이 쓴다) ----------
+// 드롭다운에서 고르면 꼬리표(2018 ×)가 붙고 꼬리표를 누르면 빠진다. 고른 것만 줄지어 있어야 지금 무엇을 겹쳤는지 한눈에 보인다
+// (전에는 해 31개가 전부 단추로 깔려 있어 고른 해가 묻혔다).
+// 색은 고른 것에 묶는다: 고를 때 남는 색을 받고 뺄 때까지 그대로다(다른 것을 넣고 빼도 안 바뀐다).
+// 색은 7개뿐이라 그 뒤로 고른 것과 "전체 겹치기"로 한꺼번에 넣은 것은 회색이다. 서른 개를 다 다른 색으로 칠해도 구별이 안 된다.
+const PCOL = ['--s1', '--s2', '--s3', '--s4', '--s5', '--s6', '--s7'], PGRAY = '--muted';
+const pickAdd = (pick, k, gray) => { if (!pick.has(k)) pick.set(k, !gray && PCOL.find(c => ![...pick.values()].includes(c)) || PGRAY); };
+// 탭 4 는 BIS 가 쓴 글(금리 설명)을 화면에 넣는다. 남이 쓴 글이라 꺾쇠를 풀어서 넣는다.
+const esc = t => String(t).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+/* o: {pick: Map(키 -> 색), items: [{k, label, opt: 목록에 쓸 글(없으면 label), group, mid}], ask: 목록 첫 줄, none: 고른 것이 없을 때 글, change()}
+   돌려주는 함수를 부르면 목록(아직 안 고른 것)과 꼬리표(고른 것)를 pick 에 맞춰 다시 만든다. */
+function picker(sel, box, o) {
+  const opt = it => `<option value="${it.k}">${esc(it.opt || it.label)}</option>`;
+  sel.onchange = () => { if (sel.value) { pickAdd(o.pick, sel.value); o.change(); } };
+  box.onclick = ev => { const b = ev.target.closest('button'); if (b) { o.pick.delete(b.dataset.k); o.change(); } };
+  return () => {
+    const left = o.items.filter(it => !o.pick.has(it.k)), groups = [...new Set(left.map(it => it.group || ''))];
+    sel.innerHTML = `<option value="">${left.length ? o.ask : '모두 골랐습니다'}</option>` + groups.map(g => {
+      const h = left.filter(it => (it.group || '') === g).map(opt).join('');
+      return g ? `<optgroup label="${esc(g)}">${h}</optgroup>` : h; }).join('');
+    sel.disabled = !left.length;
+    // 색을 받은 것을 앞에 둔다. "전체 겹치기"를 하면 회색 꼬리표 수십 개 사이에 묻힌다.
+    const on = o.items.filter(it => o.pick.has(it.k)), gray = it => o.pick.get(it.k) === PGRAY;
+    box.innerHTML = [...on.filter(it => !gray(it)), ...on.filter(gray)].map(it =>
+      `<button data-k="${it.k}"${it.mid ? ' class="mid"' : ''} title="누르면 뺍니다" aria-label="${esc(it.label)} 빼기">` +
+      `<i style="background:var(${o.pick.get(it.k)})"></i><span>${esc(it.label)}</span><b aria-hidden="true">×</b></button>`).join('') || `<small>${o.none}</small>`;
+  };
+}
+
 // ---------- 탭 3: 여러 해 겹쳐 보기 (S&P500) ----------
 // 검은 선은 늘 자료의 마지막 해다. 묻는 것이 "올해가 어느 해와 닮았나"라서 한쪽은 고르지 않는다.
 const YA = SPX.end.slice(0, 4), YD = SPX.days.length - 1;  // YD: 한 해의 칸 수(365). 0번 칸은 "전년 말"
 // 중간선거일은 11월 첫 월요일 다음 날로 정해져 있어 자료 없이 계산한다. 4로 나눠 2가 남는 해에 있다.
 const voteDay = y => y % 4 === 2 ? '11-' + String(2 + (8 - new Date(+y, 10, 1).getDay()) % 7).padStart(2, '0') : null;
-// 색은 고른 해에 묶는다: 누를 때 남는 색을 받고 뺄 때까지 그대로다(다른 해를 넣고 빼도 안 바뀐다).
-// 색은 7개뿐이라 그 뒤로 누른 해와 "전체 겹치기"로 한꺼번에 넣은 해는 회색이다. 서른 개를 다 다른 색으로 칠해도 구별이 안 된다.
-const YCOL = ['--s1', '--s2', '--s3', '--s4', '--s5', '--s6', '--s7'], YGRAY = '--muted';
 const yYears = Object.keys(SPX.years).filter(y => y !== YA), yPick = new Map();  // yPick: 고른 해(문자열) -> 색
-const yAdd = (y, gray) => { y = String(y); if (yPick.has(y) || !yYears.includes(y)) return;
-  yPick.set(y, !gray && YCOL.find(c => ![...yPick.values()].includes(c)) || YGRAY); };
+const yAdd = (y, gray) => { y = String(y); if (yYears.includes(y)) pickAdd(yPick, y, gray); };
+const yDraw = picker(gui('y_add'), gui('y_chips'), {pick: yPick, ask: '해 고르기', none: '고른 해가 없습니다. 위 목록에서 고르세요.', change: () => yearRender(),
+  items: yYears.map(y => ({k: y, label: y, opt: voteDay(y) ? y + ' · 중간선거' : y, mid: !!voteDay(y)}))});
 /* s 년부터 n 해를 한 선으로 잇는다. 값은 "s 년의 전년 마지막 종가 = 0%", 길이는 1 + 365n, 자료가 없는 칸은 null.
    자료는 해마다 "그 해의 전년 말 = 0%"라서, 앞 해들의 연말 누적(base)에 곱해 잇는다. */
 function yearPath(s, n) {
@@ -771,15 +856,14 @@ function yearPath(s, n) {
   return out;
 }
 function yearRender() {
-  gui('y_years').innerHTML = yYears.map(y => { const c = yPick.get(y);
-    return `<button data-y="${y}" aria-pressed="${!!c}"${voteDay(y) ? ' class="mid" title="중간선거가 있는 해"' : ''}>${c ? `<i style="background:var(${c})"></i>` : ''}${y}</button>`; }).join('');
+  yDraw();
   gui('y_cnt').textContent = `고른 해 ${yPick.size}개`;
   const n = +gui('y_n').value, L = n * YD + 1, md = i => SPX.days[(i - 1) % YD + 1];
   const lastOf = v => { let i = v.length - 1; while (v[i] == null) i--; return i; };
   const mk = (s, color, base) => { const v = yearPath(s, n), e = +s + n - 1;
     return {s: +s, v, color, last: lastOf(v), name: n === 1 ? `${s}년` : base ? `${s}년~` : `${s}~${e}년`, short: n === 1 ? `${s}년` : `${s}~${String(e).slice(2)}`}; };
   const A = mk(YA, '--ink', true), T = A.last;  // T: 올해 값이 있는 마지막 칸. 표의 기준 날짜
-  const B = [...yPick].sort((a, b) => a[0] - b[0]).map(([y, c]) => mk(y, c)), G = B.filter(p => p.color === YGRAY);
+  const B = [...yPick].sort((a, b) => a[0] - b[0]).map(([y, c]) => mk(y, c)), G = B.filter(p => p.color === PGRAY);
   const D = n === 1 ? SPX.days : ['전년 말'].concat(...Array.from({length: n}, (_, k) => SPX.days.slice(1).map(d => `${k + 1}년차 ${d}`)));
   // 가로축: 한 해면 달마다, 여러 해면 분기마다(1월 자리에는 몇 년차인지)
   const xticks = [];
@@ -799,11 +883,11 @@ function yearRender() {
     return a.length ? `중앙값 ${pc(a.length % 2 ? a[h] : (a[h - 1] + a[h]) / 2)} (${pc(a[0])} ~ ${pc(a[a.length - 1])})` : null; });
   gui('y_title').textContent = `S&P500 연초부터의 수익률 (%, ${n > 1 ? '시작 해의 ' : ''}전년 마지막 종가 = 0) - 검은 선 ${YA}년은 ${SPX.end} 까지`;
   chart(gui('y_chart'), {dates: D, h: 320, fmt: pc, zero: true, xticks, vlines, bands,
-    extraLegend: G.length ? [{color: YGRAY, name: `회색 선 ${G.length}개 (해마다 값은 아래 표)`}] : [],
-    extraTip: G.length ? [{color: YGRAY, name: `회색 선 ${G.length}개`, vals: gsum, fmt: t => t}] : [],
+    extraLegend: G.length ? [{color: PGRAY, name: `회색 선 ${G.length}개 (해마다 값은 아래 표)`}] : [],
+    extraTip: G.length ? [{color: PGRAY, name: `회색 선 ${G.length}개`, vals: gsum, fmt: t => t}] : [],
     // 중간에서 끝나는 선에는 오른쪽 끝 이름표를 달지 않는다(끝이 아닌 자리의 값을 끝 값처럼 보이게 한다)
     lines: [{name: A.name, vals: [A.v], color: A.color, fmt: pc, w: 2.2, noEnd: true},
-            ...B.map(p => p.color === YGRAY ? {name: p.name, vals: [p.v], color: YGRAY, w: 1, op: .6, quiet: true}
+            ...B.map(p => p.color === PGRAY ? {name: p.name, vals: [p.v], color: PGRAY, w: 1, op: .6, quiet: true}
               : {name: p.name, short: p.short, vals: [p.v], color: p.color, fmt: pc, w: 1.6, noEnd: p.last < L - 1})]});
   const row = p => { const v = p.v; let lo = 1, hi = 1;
     for (let i = 1; i <= T; i++) { if (v[i] < v[lo]) lo = i; if (v[i] > v[hi]) hi = i; }
@@ -818,8 +902,6 @@ function yearRender() {
     `<th>그 뒤 ${n > 1 ? n + '년차 ' : ''}연말까지</th><th>${n > 1 ? n + '년' : '한 해'} 전체</th>${n > 1 ? '<th>해마다</th>' : ''}</tr>` + [A, ...B].map(row).join('');
 }
 gui('y_n').innerHTML = [1, 2, 3, 4].map(k => `<option value="${k}">${k}년</option>`).join('');
-gui('y_years').onclick = ev => { const b = ev.target.closest('button'); if (!b) return;
-  if (yPick.has(b.dataset.y)) yPick.delete(b.dataset.y); else yAdd(b.dataset.y); yearRender(); };
 gui('y_all').onclick = () => { yYears.forEach(y => yAdd(y, true)); yearRender(); };
 gui('y_mid').onclick = () => { yPick.clear(); yYears.filter(voteDay).forEach(y => yAdd(y)); yearRender(); };
 gui('y_none').onclick = () => { yPick.clear(); yearRender(); };
@@ -828,16 +910,81 @@ gui('y_n').onchange = yearRender;
 // 숨겨진 채로 한 번 그린다. 보일 때 다시 그리지만, 여기서 그려 둬야 화면 검사(check.py)가 이 탭의 오류를 잡는다.
 yearRender();
 
+// ---------- 탭 4: 주요국 정책금리 ----------
+// 자료는 "금리가 바뀐 날"만 온다(common.py 의 rate_steps). 여기서 하루 칸으로 편다 - 차트는 칸 번호로 그리고, 마우스를 올린 날의 값도 칸에서 읽는다.
+// 거래일이 아니라 달력 날짜 칸이다. 나라마다 쉬는 날이 달라 어느 한 나라의 거래일에 맞출 수 없다.
+const DAY = 864e5, rT0 = Date.parse(RATES.start), RN = Math.round((Date.parse(RATES.end) - rT0) / DAY) + 1;
+const RD = Array.from({length: RN}, (_, i) => new Date(rT0 + i * DAY).toISOString().slice(0, 10));
+const rIdx = d => Math.round((Date.parse(d) - rT0) / DAY);
+const RC = Object.keys(RATES.areas), rPick = new Map(), rCache = {};
+// 한 나라의 하루 칸. 단계의 값이 다음 단계 전날까지, 마지막 단계는 그 나라 자료의 마지막 날까지 간다. 그 뒤와 금리가 없던 단계는 빈 칸으로 둔다.
+const rVals = c => rCache[c] || (rCache[c] = (() => { const A = RATES.areas[c], out = new Array(RN).fill(null);
+  A.steps.forEach(([d, v], k) => { if (v != null) out.fill(v, rIdx(d), k + 1 < A.steps.length ? rIdx(A.steps[k + 1][0]) : rIdx(A.last) + 1); });
+  return out; })());
+// 미국은 목표 범위의 가운데 값이라 3.875 처럼 셋째 자리까지 온다. 그런 값만 셋째 자리를 보여 준다
+const rnum = v => v.toLocaleString('ko-KR', {minimumFractionDigits: 2, maximumFractionDigits: 3});
+const rp = v => rnum(v) + '%', pp = v => { v = +v.toFixed(3) || 0; return (v > 0 ? '+' : '') + rnum(v) + '%p'; };
+const rDraw = picker(gui('r_add'), gui('r_chips'), {pick: rPick, ask: '나라 고르기', none: '고른 나라가 없습니다. 위 목록에서 고르세요.', change: () => rateRender(),
+  items: RC.map(c => ({k: c, label: RATES.areas[c].name, group: RATES.areas[c].group}))});
+function rateRender() {
+  rDraw();
+  const yrs = +gui('r_span').value, a = yrs ? Math.max(0, RN - 1 - Math.round(365.25 * yrs)) : 0, n = RN - a, D = RD.slice(a);
+  const P = RC.filter(c => rPick.has(c)).map(c => { const v = rVals(c).slice(a); let last = n - 1; while (last >= 0 && v[last] == null) last--;
+    return {c, A: RATES.areas[c], v, last, color: rPick.get(c)}; });
+  const G = P.filter(p => p.color === PGRAY), cap = +gui('r_cap').value, over = cap && P.filter(p => p.v.some(v => v > cap));
+  gui('r_cnt').textContent = `고른 나라 ${P.length}개`;
+  gui('r_title').textContent = `${P.length === 1 ? P[0].A.name + ' ' : ''}정책금리 (%) - ${D[0]} ~ ${RATES.end}` +
+    (over && over.length ? ` · 세로축 ${cap}%까지 - ${over.map(p => p.A.name).join('·')}의 선은 위로 잘립니다(값은 표와 마우스를 올린 자리에 그대로)` : '');
+  if (!P.length) { gui('r_chart').className = 'gap'; gui('r_chart').textContent = '나라를 고르세요.'; gui('r_table').innerHTML = ''; return; }
+  // 가로축: 3년까지는 달마다, 그보다 길면 해마다. 달력 날짜 칸이라 chart() 가 거래일 수로 정하는 기준(330칸)을 쓸 수 없다.
+  const byM = n <= 1200, xticks = [];
+  D.forEach((d, i) => { if (!i || !d.endsWith(byM ? '-01' : '-01-01')) return;
+    xticks.push({i, label: d.slice(5, 7) !== '01' ? +d.slice(5, 7) + '월' : byM ? d.slice(2, 4) + '.01' : d.slice(0, 4)}); });
+  // 회색 선은 툴팁에 하나씩 적지 않고 그날의 중앙값과 가장 낮은·높은 나라로 묶는다. 칸이 1만 개라 미리 만들지 않고 마우스가 올라간 칸만 계산한다.
+  const gsum = i => { const q = G.filter(p => p.v[i] != null).sort((x, y) => x.v[i] - y.v[i]), h = q.length >> 1;
+    return q.length ? `중앙값 ${rp(q.length % 2 ? q[h].v[i] : (q[h - 1].v[i] + q[h].v[i]) / 2)} · 최저 ${esc(q[0].A.name)} ${rp(q[0].v[i])} · 최고 ${esc(q[q.length - 1].A.name)} ${rp(q[q.length - 1].v[i])}` : '-'; };
+  chart(gui('r_chart'), {dates: D, h: 340, fmt: v => v + '%', zero: true, ymax: cap || null, xticks, aria: '주요국 정책금리',
+    extraLegend: G.length ? [{color: PGRAY, name: `회색 선 ${G.length}개 (나라마다 값은 아래 표)`}] : [],
+    extraTip: G.length ? [{color: PGRAY, name: `회색 선 ${G.length}개`, vals: D.map((_, i) => i), fmt: gsum}] : [],
+    // 오른쪽 끝에서 한참 못 미쳐 끝나는 선에는 끝 이름표를 달지 않는다(끝이 아닌 자리의 값을 지금 값처럼 보이게 한다)
+    lines: P.map(p => p.color === PGRAY ? {name: p.A.name, vals: [p.v], color: PGRAY, w: 1, op: .6, quiet: true, step: true}
+      : {name: p.A.name, vals: [p.v], color: p.color, fmt: rp, w: 1.8, step: true, noEnd: p.last < (n - 1) * 0.9})});
+  const sw = c => `<i style="display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px;background:var(${c})"></i>`;
+  const row = p => { const A = p.A, st = A.steps, k = st.length - 1, full = rVals(p.c), e = rIdx(A.last), ago = e >= 365 ? full[e - 365] : null;
+    let lo = -1, hi = -1; p.v.forEach((v, i) => { if (v == null) return; if (lo < 0 || v < p.v[lo]) lo = i; if (hi < 0 || v > p.v[hi]) hi = i; });
+    const step = k > 0 && st[k - 1][1] != null ? ` <small>${pp(st[k][1] - st[k - 1][1])}</small>` : '';
+    return `<tr><td>${sw(p.color)}${esc(A.name)}</td><td>${rp(full[e])} <small>${A.last}</small></td><td>${k > 0 ? st[k][0] : '-'}${step}</td>` +
+      `<td>${ago == null ? '-' : `${pp(full[e] - ago)} <small>${rp(ago)}에서</small>`}</td>` +
+      `<td>${hi < 0 ? '-' : `${rp(p.v[hi])} <small>${D[hi]}</small>`}</td><td>${lo < 0 ? '-' : `${rp(p.v[lo])} <small>${D[lo]}</small>`}</td>` +
+      `<td>${st[0][0] === RATES.start ? RATES.start.slice(0, 4) + '년 전부터' : st[0][0]}</td></tr>`; };
+  gui('r_table').innerHTML = `<tr><th>나라</th><th>지금 금리 <small>자료 마지막 날</small></th><th>마지막으로 바꾼 날 <small>폭</small></th><th>1년 전보다</th>` +
+    `<th>이 기간 최고 <small>처음 닿은 날</small></th><th>이 기간 최저 <small>처음 닿은 날</small></th><th>자료 시작</th></tr>` + P.map(row).join('');
+}
+const RMAIN = RATES.areas[RC[0]].group;  // 목록의 첫 묶음(assets.py 의 RATES 순서)
+gui('r_n').textContent = RC.length;
+gui('r_range').textContent = `${RATES.start} ~ ${RATES.end}`;
+gui('r_span').innerHTML = [[0, '전체'], [20, '최근 20년'], [10, '최근 10년'], [5, '최근 5년'], [3, '최근 3년'], [1, '최근 1년']].map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
+gui('r_cap').innerHTML = [[0, '고른 나라에 맞춤'], [20, '20%까지'], [10, '10%까지']].map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
+gui('r_span').onchange = gui('r_cap').onchange = rateRender;
+gui('r_main').onclick = () => { rPick.clear(); RC.filter(c => RATES.areas[c].group === RMAIN).forEach(c => pickAdd(rPick, c)); rateRender(); };
+gui('r_all').onclick = () => { RC.forEach(c => pickAdd(rPick, c, true)); rateRender(); };
+gui('r_none').onclick = () => { rPick.clear(); rateRender(); };
+gui('r_notes').innerHTML = '<tr><th>나라</th><th style="text-align:left">BIS 의 설명</th></tr>' +
+  RC.map(c => `<tr><td>${esc(RATES.areas[c].name)}</td><td class="wrap" style="text-align:left">${esc(RATES.areas[c].note) || '-'}</td></tr>`).join('');
+['US', 'KR'].forEach(c => { if (RATES.areas[c]) pickAdd(rPick, c); });  // 처음 값: 물어본 두 나라(미국 연준, 한국은행)
+// 숨겨진 채로 한 번 그린다(탭 3 과 같은 이유 - 화면 검사가 이 탭의 오류를 잡게)
+rateRender();
+
 const tabBtns = document.querySelectorAll('.tabs button');
 function setTab(t) {
   tabBtns.forEach(b => { const on = b.dataset.tab === t; b.classList.toggle('on', on); b.setAttribute('aria-selected', on);
     gui('tab_' + b.dataset.tab).hidden = !on; });
   splitBtn.hidden = t !== 'explore';
   // 숨겨진 동안에는 폭이 0이라 차트를 못 그린다. 보이게 된 쪽을 그때 다시 그린다.
-  if (t === 'sig') sigRender(); else if (t === 'year') yearRender(); else window.dispatchEvent(new Event('resize'));
+  if (t === 'sig') sigRender(); else if (t === 'year') yearRender(); else if (t === 'rate') rateRender(); else window.dispatchEvent(new Event('resize'));
 }
 tabBtns.forEach(b => b.onclick = () => setTab(b.dataset.tab));
-window.addEventListener('resize', () => { if (!gui('tab_sig').hidden) sigRender(); if (!gui('tab_year').hidden) yearRender(); });
+window.addEventListener('resize', () => { if (!gui('tab_sig').hidden) sigRender(); if (!gui('tab_year').hidden) yearRender(); if (!gui('tab_rate').hidden) rateRender(); });
 tabBtns[0].classList.add('on');
 { // 점검·공유용: #sig, #sig-2026-06-22, #sig-2026-06-22-f12, #sig-2026-06-22-f12-kospi 처럼 탭·기준일·지표·대상을 주소로 연다
   const mm = location.hash.match(/^#sig(?:-(\d{4}-\d{2}-\d{2}))?(?:-([a-z0-9]+))?(?:-([a-z]+))?/);
@@ -849,6 +996,15 @@ tabBtns[0].classList.add('on');
     ym[1].split('-').filter(Boolean).forEach(y => yAdd(y));
     if (ym[2] === '-mid') yYears.filter(voteDay).forEach(y => yAdd(y)); else if (ym[2]) yYears.forEach(y => yAdd(y, true));
     if (ym[3]) gui('y_n').value = ym[3]; setTab('year'); }
+  // #rate, #rate-us-kr-jp(나라 부호 몇 개든), #rate-all, #rate-us-kr-all(둘은 색, 나머지는 회색), 끝에 -y10(기간: 최근 몇 년), -c20(세로축: 몇 %까지)
+  // 나라 부호 뒤에 글자가 더 오면 부호가 아니다 - 이 조건이 없으면 "-all" 의 "al" 을 나라로 읽는다.
+  const rm = location.hash.match(/^#rate((?:-[a-z]{2}(?![a-z]))*)(-all)?(?:-y(\d+))?(?:-c(\d+))?/);
+  if (rm) { if (rm[1] || rm[2]) rPick.clear();
+    rm[1].split('-').filter(Boolean).forEach(c => { c = c.toUpperCase(); if (RATES.areas[c]) pickAdd(rPick, c); });
+    if (rm[2]) RC.forEach(c => pickAdd(rPick, c, true));
+    if (rm[3] && [...gui('r_span').options].some(o => o.value === rm[3])) gui('r_span').value = rm[3];
+    if (rm[4] && [...gui('r_cap').options].some(o => o.value === rm[4])) gui('r_cap').value = rm[4];
+    setTab('rate'); }
   // #assets-samsung-kospi: 탭 1의 왼쪽·오른쪽 창 대상을 주소로 정한다
   const am = location.hash.match(/assets-([a-z]+)-([a-z]+)/);
   if (am && ALL[am[1]] && ALL[am[2]]) { panes.L.setAsset(am[1]); panes.R.setAsset(am[2]); }

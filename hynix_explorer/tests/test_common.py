@@ -144,5 +144,62 @@ class Flows(Base):
         self.assertTrue(f.isna().all().all())
 
 
+class RateSteps(unittest.TestCase):
+    """정책금리를 "바뀐 날"로 줄이는 규칙. 틀려도 선은 그럴듯하게 그려지므로 손으로 셀 수 있는 표로 본다."""
+
+    @staticmethod
+    def wide(**cols):
+        return pd.DataFrame({c: pd.Series({pd.Timestamp(d): v for d, v in rows.items()}) for c, rows in cols.items()}).sort_index()
+
+    @staticmethod
+    def daily(start, end, v):
+        return {d.strftime("%Y-%m-%d"): v for d in pd.date_range(start, end)}
+
+    def test_keeps_only_the_days_the_rate_changed(self):
+        r = common.rate_steps(self.wide(A={**self.daily("2020-01-01", "2020-01-10", 1.0), **self.daily("2020-01-11", "2020-01-12", 1.5)}))
+        self.assertEqual(r["areas"]["A"], {"last": "2020-01-12", "steps": [["2020-01-01", 1.0], ["2020-01-11", 1.5]]})
+
+    def test_short_gap_carries_the_last_value(self):
+        # 주말·연휴: 01-04 ~ 01-09 가 비어도 같은 금리가 이어진 것으로 본다
+        r = common.rate_steps(self.wide(A={**self.daily("2020-01-01", "2020-01-03", 1.0), "2020-01-10": 1.0, "2020-01-11": 1.5}))
+        self.assertEqual(r["areas"]["A"]["steps"], [["2020-01-01", 1.0], ["2020-01-11", 1.5]])
+
+    def test_gap_is_filled_up_to_the_limit_and_left_empty_beyond_it(self):
+        day = lambda n: (pd.Timestamp("2020-01-01") + pd.Timedelta(n, "D")).strftime("%Y-%m-%d")
+        fill = common.rate_steps(self.wide(A={day(0): 1.0, day(common.RATE_FILL + 1): 0.5}))   # 빈 날이 딱 RATE_FILL 일
+        self.assertEqual(fill["areas"]["A"]["steps"], [[day(0), 1.0], [day(common.RATE_FILL + 1), 0.5]])
+        # 하루만 더 비어도 잇지 않는다. 정책금리가 없던 기간(일본)에 직전 금리를 그리면 안 된다
+        hole = common.rate_steps(self.wide(A={day(0): 1.0, day(common.RATE_FILL + 2): 0.5}))
+        self.assertEqual(hole["areas"]["A"]["steps"], [[day(0), 1.0], [day(1), None], [day(common.RATE_FILL + 2), 0.5]])
+
+    def test_starts_with_the_value_in_force_on_the_first_day_shown(self):
+        r = common.rate_steps(self.wide(A={**self.daily("1994-06-01", "1995-02-28", 7.0), **self.daily("1995-03-01", "1995-03-05", 6.0)}))
+        self.assertEqual(r["start"], common.RATE_FROM)
+        self.assertEqual(r["areas"]["A"]["steps"], [[common.RATE_FROM, 7.0], ["1995-03-01", 6.0]])
+
+    def test_each_country_ends_on_its_own_last_day(self):
+        # 늦게 오는 나라의 뒤를 메우지 않는다. 그 사이에 금리가 바뀌었을 수 있다
+        r = common.rate_steps(self.wide(A=self.daily("2020-01-01", "2020-03-01", 1.0), B=self.daily("2020-01-05", "2020-02-01", 2.0)))
+        self.assertEqual(r["end"], "2020-03-01")
+        self.assertEqual(r["areas"]["B"], {"last": "2020-02-01", "steps": [["2020-01-05", 2.0]]})
+
+    def test_country_without_values_is_left_out(self):
+        w = self.wide(A=self.daily("2020-01-01", "2020-01-05", 1.0))
+        w["B"] = np.nan
+        self.assertEqual(list(common.rate_steps(w)["areas"]), ["A"])
+
+
+class RateData(Base):
+    def test_attaches_screen_name_group_and_the_source_note(self):
+        self.csv("bis_rates.csv", [("2020-01-01", 1.0, 9.0), ("2020-01-02", 1.25, 9.0)], ["US", "KR"])
+        (self.d / "bis_rates_meta.json").write_text('{"US": "mid-point <of> the target"}', encoding="utf-8")
+        with mock.patch.object(common, "RATES", {"KR": ("한국", "주요"), "US": ("미국", "주요")}):
+            r = common.rate_data()
+        self.assertEqual(list(r["areas"]), ["KR", "US"])  # 화면 순서는 파일의 열 순서가 아니라 assets.RATES 순서다
+        self.assertEqual(r["areas"]["US"], {"last": "2020-01-02", "steps": [["2020-01-01", 1.0], ["2020-01-02", 1.25]],
+                                            "name": "미국", "group": "주요", "note": "mid-point <of> the target"})
+        self.assertEqual(r["areas"]["KR"]["note"], "")
+
+
 if __name__ == "__main__":
     unittest.main()

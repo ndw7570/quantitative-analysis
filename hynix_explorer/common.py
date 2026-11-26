@@ -1,10 +1,11 @@
 """analyze.py 와 signals.py 가 같이 쓰는 데이터 읽기. 같은 파일을 두 군데서 다르게 읽으면 탭마다 값이 어긋난다."""
+import json
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from assets import ASSETS
+from assets import ASSETS, RATES
 
 D = Path(__file__).parent / "data"
 WHO = ("foreign", "inst", "indiv")
@@ -57,6 +58,49 @@ def year_paths(close):
         vals = [0.0] + [round(float(v), 2) for v in s]
         years[str(y)] = vals + [None] * (len(YEAR_DAYS) - len(vals))
     return {"end": last.strftime("%Y-%m-%d"), "days": YEAR_DAYS, "years": years}
+
+
+RATE_FROM = "1995-01-01"  # 탭 3 과 같은 해부터 보여 준다
+RATE_FILL = 31  # 이 날수까지 빈 곳은 직전 값을 잇는다. 받은 자료에서 연휴로 빈 가장 긴 곳이 15일이었다(태국 2020-11, 2026-11-26 확인)
+
+
+def rate_steps(wide):
+    """나라마다 정책금리가 "바뀐 날"만 남긴다(탭 4 "주요국 정책금리"). 화면이 이것을 하루 칸으로 다시 편다.
+
+    정책금리는 계단 모양이라 하루 값 1만여 개 대신 바뀐 날 수십~수백 개면 같은 그림이 나온다.
+    wide: 날짜가 줄, 나라 부호가 열인 일별 표(fetch.rates 가 만든 bis_rates.csv).
+    - 주말·연휴처럼 짧게 빈 곳(RATE_FILL 일까지)은 직전 값을 잇는다.
+    - 그보다 길게 빈 곳은 통째로 비운다. 일본은 몇 해씩 비어 있는 기간이 세 번 있고 BIS 가 그중 2013-04 ~ 2016-09 를 "no policy rate"로 적어 두었다. 이으면 없던 금리를 그리게 된다.
+    - 나라마다 마지막 날이 달라도 뒤를 메우지 않는다. 그 사이에 금리가 바뀌었을 수 있다. 선은 받은 날(last)에서 끝난다.
+    steps: [[날짜, 값], ...]. 그날부터 다음 단계 전날(마지막 단계는 last)까지 그 값이다. 값이 None 이면 그 동안 정책금리가 없다.
+    """
+    areas = {}
+    for c in wide.columns:
+        have = wide[c].dropna()
+        if have.empty:
+            continue
+        s = wide[c].reindex(pd.date_range(have.index[0], have.index[-1]))
+        run = s.isna().groupby(s.notna().cumsum()).transform("sum")  # 각 날이 속한 빈 구간의 길이
+        s = s.ffill().where(s.notna() | (run <= RATE_FILL)).loc[RATE_FROM:].round(4)
+        if s.dropna().empty:
+            continue
+        s = s.loc[s.first_valid_index():]
+        prev = s.shift()
+        turn = s.ne(prev) & ~(s.isna() & prev.isna())  # NaN 은 자기 자신과도 다르다고 나와서 따로 뺀다
+        areas[c] = {"last": have.index[-1].strftime("%Y-%m-%d"),
+                    "steps": [[d.strftime("%Y-%m-%d"), None if pd.isna(v) else float(v)] for d, v in s[turn].items()]}
+    return {"start": RATE_FROM, "end": max(a["last"] for a in areas.values()), "areas": areas}
+
+
+def rate_data():
+    """탭 4 에 싣는 것 전부: rate_steps 에 화면 이름·묶음(assets.RATES)과 BIS 의 금리 설명을 붙인다.
+    build.py 와 check.py 가 같이 쓴다 - 따로 만들면 "HTML 에 든 값이 자료와 같은가"를 비교할 수 없다."""
+    out = rate_steps(pd.read_csv(D / "bis_rates.csv", index_col=0, parse_dates=True)[list(RATES)])
+    notes = json.loads((D / "bis_rates_meta.json").read_text(encoding="utf-8"))
+    for c, a in out["areas"].items():
+        a["name"], a["group"] = RATES[c]
+        a["note"] = notes.get(c, "")
+    return out
 
 
 def on_calendar(px, cal):

@@ -87,5 +87,18 @@ class Layout(unittest.TestCase):
             self.assertIn((a["market"], a["kind"]), check.BIG_MOVE, k)
 
 
+class RatesLayout(unittest.TestCase):
+    def test_template_has_one_rates_slot_where_check_looks_for_it(self):
+        html = (HERE / "template.html").read_text(encoding="utf-8")
+        self.assertEqual(html.count("__RATES__"), 1)
+        self.assertIn("const RATES = __RATES__", html)  # check.py 가 이 표시 뒤에서 정책금리를 읽는다
+
+    def test_first_group_of_rates_is_the_main_six_button(self):
+        from assets import RATES
+        first = next(iter(RATES.values()))[1]
+        self.assertEqual([c for c, (_, g) in RATES.items() if g == first], ["US", "KR", "XM", "JP", "GB", "CN"])
+        self.assertIn('<button id="r_main">주요 6개</button>', (HERE / "template.html").read_text(encoding="utf-8"))
+
+
 if __name__ == "__main__":
     unittest.main()
