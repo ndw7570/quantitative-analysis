@@ -143,7 +143,9 @@ class Events(unittest.TestCase):
     def test_dart_rows_classify_by_title_words_and_skip_the_rest(self):
         dart = {"hynix": [{"date": "2026-10-28", "no": "20261028000001", "name": "연결재무제표기준영업(잠정)실적(공정공시)", "ty": "I"},
                           {"date": "2026-10-28", "no": "20261028000002", "name": "주요사항보고서(자기주식취득결정)", "ty": "B"},
-                          {"date": "2026-10-14", "no": "20261014000003", "name": "기업설명회(IR)개최(안내공시)", "ty": "I"}]}
+                          {"date": "2026-10-14", "no": "20261014000003", "name": "기업설명회(IR)개최(안내공시)", "ty": "I"},
+                          {"date": "2026-10-02", "no": "20261002000004", "name": "최대주주등소유주식변동신고서", "ty": "I"},
+                          {"date": "2026-10-01", "no": "20261001000005", "name": "영업(잠정)실적(공정공시)(자회사의 주요경영사항)", "ty": "I"}]}
         rows = events.dart_rows(dart)
         self.assertEqual([(r["category"], r["title"]) for r in rows],
                          [("earnings", "SK하이닉스 공시: 연결재무제표기준영업(잠정)실적(공정공시)"), ("shareholder", "SK하이닉스 공시: 주요사항보고서(자기주식취득결정)")])

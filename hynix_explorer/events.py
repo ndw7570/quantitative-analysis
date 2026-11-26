@@ -59,6 +59,10 @@ DART_WORDS = [("earnings", ("잠정)실적", "잠정실적", "영업실적")),
               ("incident", ("소송", "영업정지", "화재", "제재", "행정처분", "거래정지", "회생"))]
 
 
+# 이 낱말이 든 공시는 분류 전에 뺀다: 임원·대주주의 지분 변동 신고(1,392건), 대주주와의 부동산 임대, 자회사의 일(자회사 실적·계약은 모회사 사건이 아니다).
+DART_SKIP = ("소유주식변동신고서", "부동산임대", "부동산임차", "자회사의 주요경영사항", "자회사의주요경영사항", "종속회사")
+
+
 def load_dart():
     """fetch.py dart 가 받은 공시 목록. 키가 없어 안 받았으면 빈 것."""
     p = D / "dart_list.json"
@@ -71,6 +75,8 @@ def dart_rows(dart):
     for key, filings in dart.items():
         a = ASSETS[key]
         for f in filings:
+            if any(w in f["name"] for w in DART_SKIP):
+                continue
             cat = next((c for c, words in DART_WORDS if any(w in f["name"] for w in words)), None)
             if not cat:
                 continue

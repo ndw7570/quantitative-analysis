@@ -11,3 +11,7 @@ hynix_report/data/
 hynix_explorer/logs/
 out/
 *.new.html
+
+# API 키 (수집 정책 원칙 1 - 키는 이 파일에만, git 에는 안 넣는다)
+.env
+**/.env
