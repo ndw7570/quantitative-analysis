@@ -340,6 +340,61 @@ class Sec(Base):
         self.assertEqual(f.read_text(encoding="utf-8"), "멀쩡한 파일")
 
 
+class Dart(Base):
+    """전자공시 목록: 키가 없으면 건너뛰고, 있으면 회사 번호를 찾아 B·I 공시를 쪽을 넘겨 가며 받고 정정 공시는 뺀다."""
+
+    XML = ('<result><list><corp_code>00164779</corp_code><corp_name>SK하이닉스</corp_name><corp_eng_name>SK hynix</corp_eng_name><stock_code>000660</stock_code></list>'
+           + '<list><corp_code>%08d</corp_code><corp_name>회사</corp_name><stock_code>%06d</stock_code></list>' * 1200 + '</result>')
+
+    def zip_xml(self):
+        xml = self.XML % tuple(x for i in range(1200) for x in (i + 1, 100001 + i))  # 채움용 종목 코드는 100001 부터(000660 과 안 겹치게)
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr("CORPCODE.xml", xml)
+        return buf.getvalue()
+
+    def pages(self, ty, page):
+        rows = {"B": [[("20260819", "1", "주요사항보고서(자기주식취득결정)")], [("20260710", "2", "[기재정정]주요사항보고서(유상증자결정)"), ("20260624", "3", "주요사항보고서(유상증자결정)")]],
+                "I": [[("20261028", "4", "연결재무제표기준영업(잠정)실적(공정공시)   ")]]}[ty]
+        return {"status": "000", "message": "정상", "total_page": len(rows), "list": [{"rcept_dt": d, "rcept_no": n, "report_nm": nm} for d, n, nm in rows[page - 1]]}
+
+    def run_dart(self, key="k"):
+        calls = []
+        def get(url, params=None, **kw):
+            calls.append((url.rsplit("/", 1)[-1], params))
+            if url.endswith("corpCode.xml"):
+                return mock.Mock(status_code=200, content=self.zip_xml())
+            return Resp(self.pages(params["pblntf_ty"], params["page_no"]))
+        with mock.patch.object(fetch, "dart_key", lambda: key), mock.patch.object(fetch.requests, "get", get):
+            fetch.dart()
+        return calls
+
+    def test_without_a_key_it_skips_and_writes_nothing(self):
+        self.run_dart(key=None)
+        self.assertFalse((self.out / "dart_list.json").exists())
+
+    def test_pages_through_both_types_and_drops_corrections(self):
+        import json
+        calls = self.run_dart()
+        got = json.loads((self.out / "dart_list.json").read_text(encoding="utf-8"))
+        self.assertEqual([(r["date"], r["name"], r["ty"]) for r in got["hynix"]],
+                         [("2026-06-24", "주요사항보고서(유상증자결정)", "B"), ("2026-08-19", "주요사항보고서(자기주식취득결정)", "B"),
+                          ("2026-10-28", "연결재무제표기준영업(잠정)실적(공정공시)", "I")])
+        self.assertEqual([p["corp_code"] for _, p in calls if p and "corp_code" in p], ["00164779"] * 3)  # 종목 코드로 회사 번호를 찾았다
+        self.assertEqual([(p["pblntf_ty"], p["page_no"]) for _, p in calls if p and "page_no" in p], [("B", 1), ("B", 2), ("I", 1)])
+
+    def test_error_status_raises_and_keeps_the_file(self):
+        f = self.out / "dart_list.json"
+        f.write_text("멀쩡한 파일", encoding="utf-8")
+        def get(url, params=None, **kw):
+            if url.endswith("corpCode.xml"):
+                return mock.Mock(status_code=200, content=self.zip_xml())
+            return Resp({"status": "020", "message": "요청 제한을 초과하였습니다"})
+        with mock.patch.object(fetch, "dart_key", lambda: "k"), mock.patch.object(fetch.requests, "get", get), self.assertRaises(RuntimeError):
+            fetch.dart()
+        self.assertEqual(f.read_text(encoding="utf-8"), "멀쩡한 파일")
+
+
 class Cpi(Base):
     """BIS 소비자물가 묶음 파일에서 월별 상승률 줄만 뽑는지. 한 줄이 (주기, 나라, 단위) 하나, 열이 달이다(2026-11-26 에 받은 파일의 모양)."""
     MONTHS = pd.period_range("1990-01", "2012-12", freq="M").strftime("%Y-%m")

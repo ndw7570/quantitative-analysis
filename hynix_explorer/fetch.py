@@ -9,12 +9,14 @@
       python fetch.py --today      (18시 전이라도 오늘 한국 장까지 받는다. 15:40 부터)
       python fetch.py rates cpi    (주요국 정책금리와 소비자물가만. 국제결제은행 BIS)
       python fetch.py sec          (미국 종목의 8-K 공시 목록만. SEC EDGAR)
+      python fetch.py dart         (한국 종목의 공시 목록만. 전자공시 DART - 무료 키가 .env 나 환경변수 DART_API_KEY 에 있어야 한다. 없으면 건너뛴다)
 보통은 직접 부르지 않고 update.py 가 부른다. 하나라도 실패하면 종료 코드 1 로 끝난다(update.py 가 거기서 멈춘다).
 어디서 무엇을 받는지와 그 규칙은 프로젝트의 plan/specs/data-collection-policy.md 가 정한다(이 파일은 그것을 따른다).
 로그인이 필요한 출처는 쓰지 않는다. 무료 키가 필요한 출처는 키를 환경변수에서만 읽는다(코드·문서·git 에 넣지 않는다).
 """
 import io
 import json
+import os
 import re
 import sys
 import time
@@ -57,6 +59,12 @@ SEC = "https://data.sec.gov/submissions/"
 SEC_HEAD = {"User-Agent": "hynix-explorer research tool", "Accept-Encoding": "gzip"}
 SEC_FROM = "1997-01-01"  # 탐색기의 첫해
 SEC_COLS = {"accessionNumber": "acc", "filingDate": "date", "reportDate": "report", "form": "form", "items": "items", "primaryDocument": "doc"}
+# 전자공시(DART) 공개 API. 무료 키(하루 4만 건)가 있어야 한다. 키는 환경변수 DART_API_KEY 나 이 폴더의 .env 에서만 읽는다(git 에 안 넣는다 - .gitignore).
+# corpCode.xml: 회사 번호(corp_code 8자리) <-> 종목 코드(6자리) 표 전체(zip, 3.6MB). list.json: 한 회사의 공시 목록(100건씩 쪽 넘김).
+# pblntf_ty: B 주요사항보고(자기주식·유상증자·합병 등), I 거래소공시(잠정실적·배당·공급계약 등). A 정기공시(사업·분기보고서)는 사건이 아니라 받지 않는다.
+DART = "https://opendart.fss.or.kr/api/"
+DART_TYPES = ("B", "I")
+DART_FROM = "19970101"
 STOCKS = {k: a["code"] for k, a in ASSETS.items() if a["market"] == "kr" and a["kind"] == "stock"}
 KR = {k: a["code"] for k, a in ASSETS.items() if a["market"] == "kr"}
 US = {k: a["code"] for k, a in ASSETS.items() if a["market"] == "us"}
@@ -312,6 +320,76 @@ def cpi():
     print("bis_cpi", len(out), out.index.min(), "~", out.index.max(), f"({len(RATES)}개 나라)", "가장 늦게 온 나라", ends.idxmin(), ends.min())
 
 
+def dart_key():
+    """환경변수가 먼저, 없으면 이 폴더의 .env 의 DART_API_KEY= 줄. 둘 다 없으면 None(받기를 건너뛴다)."""
+    if os.environ.get("DART_API_KEY"):
+        return os.environ["DART_API_KEY"].strip()
+    env = Path(__file__).parent / ".env"
+    if env.exists():
+        for line in env.read_text(encoding="utf-8").splitlines():
+            if line.startswith("DART_API_KEY="):
+                return line.split("=", 1)[1].strip().strip('"')
+    return None
+
+
+def dart_get(path, key, **params):
+    r = requests.get(DART + path, params={"crtfc_key": key, **params}, headers={"User-Agent": "Mozilla/5.0"}, timeout=120)
+    if r.status_code != 200:
+        raise RuntimeError(f"DART {path} 상태 {r.status_code}")
+    time.sleep(0.2)
+    return r
+
+
+def dart_corps(key):
+    """종목 코드(6자리) -> DART 회사 번호(8자리). 상장사만(종목 코드가 있는 줄만)."""
+    r = dart_get("corpCode.xml", key)
+    z = zipfile.ZipFile(io.BytesIO(r.content))
+    xml = z.read(z.namelist()[0]).decode("utf-8")
+    found = re.findall(r"<corp_code>(\d+)</corp_code>\s*<corp_name>[^<]*</corp_name>(?:\s*<corp_eng_name>[^<]*</corp_eng_name>)?\s*<stock_code>(\d{6})</stock_code>", xml)
+    if len(found) < 1000:  # 상장사는 2천 곳이 넘는다. 적게 왔으면 모양이 바뀐 것이다
+        raise RuntimeError(f"DART 회사 목록에서 상장사가 {len(found)}곳만 읽혔다")
+    return {stock: corp for corp, stock in found}
+
+
+def dart():
+    """한국 종목의 공시 목록(전자공시 DART). 주요사항보고(B)와 거래소공시(I)를 DART_FROM 뒤로 전부 받아 dart_list.json 에 둔다(종목 키 -> 줄 목록, 날짜 순).
+
+    키가 없으면 [건너뜀] 만 찍고 끝낸다 - 키가 없는 PC 에서도 update.py 가 돌아야 한다. 그러면 사건 표에 한국 공시 줄이 없다(check.py 가 알린다).
+    [기재정정] 등 정정 공시는 같은 사건이 두 번 되므로 받지 않는다. 공시의 글은 받지 않고 제목·날짜·접수번호만 받는다.
+    매번 전체를 다시 받는다 - 종목당 요청 10개 남짓, 전부 1MB 안쪽(2026-11-26 에 하이닉스는 B 410건, I 713건).
+    """
+    key = dart_key()
+    if not key:
+        print("[건너뜀] DART_API_KEY 가 없어 한국 종목의 공시 목록은 받지 않았다(.env 나 환경변수에 넣는다)", flush=True)
+        return
+    corps = dart_corps(key)
+    out = {}
+    for k, code in STOCKS.items():
+        corp = corps.get(code)
+        if not corp:
+            raise RuntimeError(f"DART 회사 목록에 종목 코드 {code}({k})가 없다")
+        rows = []
+        for ty in DART_TYPES:
+            page = 1
+            while True:
+                j = dart_get("list.json", key, corp_code=corp, bgn_de=DART_FROM, end_de=TODAY.strftime("%Y%m%d"), pblntf_ty=ty, page_count=100, page_no=page).json()
+                if j.get("status") not in ("000", "013"):  # 013 = 조회된 데이터가 없음
+                    raise RuntimeError(f"DART list {k} {ty}: {j.get('status')} {j.get('message')}")
+                for it in j.get("list", []):
+                    name = it["report_nm"].strip()
+                    if name.startswith("["):  # [기재정정], [첨부추가] 등 정정·보완
+                        continue
+                    rows.append({"date": f"{it['rcept_dt'][:4]}-{it['rcept_dt'][4:6]}-{it['rcept_dt'][6:]}", "no": it["rcept_no"], "name": name, "ty": ty})
+                if page >= int(j.get("total_page") or 0):
+                    break
+                page += 1
+        if not rows:
+            raise RuntimeError(f"DART {k}: 공시가 하나도 안 왔다")
+        out[k] = sorted(rows, key=lambda r: (r["date"], r["no"]))
+    (OUT / "dart_list.json").write_text(json.dumps(out, ensure_ascii=False, indent=0), encoding="utf-8")
+    print("dart_list", {k: f"{len(v)}건 ~{v[-1]['date']}" for k, v in out.items()})
+
+
 def sec_page(url):
     r = requests.get(url, headers=SEC_HEAD, timeout=60)
     if r.status_code != 200:
@@ -351,7 +429,7 @@ def sec():
     print("sec_8k", {k: f"{len(v)}건 ~{v[-1]['date']}" for k, v in out.items()})
 
 
-JOBS = {f.__name__: f for f in (kr_price, us, flow, kospi_flow, now, rates, cpi, sec)}
+JOBS = {f.__name__: f for f in (kr_price, us, flow, kospi_flow, now, rates, cpi, sec, dart)}
 if __name__ == "__main__":  # 테스트가 이 파일을 불러올 때는 받지 않는다
     if "--today" in sys.argv and datetime.now().strftime("%H:%M") < "15:40":
         # 장중 가격이 오늘 종가인 것처럼 저장된다. 15:30 마감 뒤 종가가 올라올 틈을 두고 받는다

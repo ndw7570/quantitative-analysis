@@ -17,7 +17,7 @@ import pandas as pd
 
 from assets import ASSETS, KR_BENCH, RATES, YEAR_IX
 from common import D, hike_data, prices, rate_data, year_close, year_data
-from events import auto_rows_all, bad_reason, load_events, load_sec
+from events import auto_rows_all, bad_reason, load_dart, load_events, load_sec
 
 FLOW_FROM = pd.Timestamp("2005-01-03")  # 네이버 증권의 투자자별 수급이 시작되는 날
 SHOW_FROM = "1997-01-01"
@@ -226,10 +226,12 @@ def check_rates():
 def check_events():
     """events/events.csv 의 자동 줄(금리 변경일)이 지금 BIS 자료와 같은지. 다르면 events.py 를 안 돌린 것이다."""
     rows = load_events()
-    want = auto_rows_all(rate_data(), load_sec())
+    want = auto_rows_all(rate_data(), load_sec(), load_dart())
     have = [r for r in rows if r["checked"] == "auto"]
     if have != want:
-        err(f"events/events.csv 의 자동 줄({len(have)}개)이 BIS·SEC 자료로 다시 만든 것({len(want)}개)과 다르다 - python events.py 를 돌린다")
+        err(f"events/events.csv 의 자동 줄({len(have)}개)이 BIS·SEC·DART 자료로 다시 만든 것({len(want)}개)과 다르다 - python events.py 를 돌린다")
+    if not load_dart():
+        warn("data/dart_list.json 이 없다 - 한국 종목의 공시 줄이 사건 표에 없다(DART 키를 .env 에 넣고 fetch.py dart 로 받는다)")
     if not load_sec():
         warn("data/sec_8k.json 이 없다 - 미국 종목의 공시 줄이 사건 표에 없다(fetch.py sec 로 받는다)")
     bad = [(r, bad_reason(r)) for r in rows if r["checked"] != "auto"]

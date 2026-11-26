@@ -121,7 +121,7 @@ td small,th small{color:var(--muted);font-weight:400}
   <ul>
     <li><b>기간 비교</b>: 왼쪽·오른쪽 창에서 각각 대상(한국 9개, 미국 6개)과 연도·월을 고릅니다. 예) 왼쪽 2025년 1월, 오른쪽 2026년 1월. 같은 기간에 대상만 다르게 놓아도 됩니다. 날짜를 직접 넣어도 됩니다. 창 머리는 스크롤해도 위에 붙어 있습니다.</li>
     <li><b>대상마다 시작하는 해가 다릅니다</b>: <span class="m_starts"></span>. 그보다 앞의 기간을 고르면 창에 안내가 나옵니다. 투자자별 수급은 어느 대상이든 2005년부터입니다.</li>
-    <li><b>구간 분석</b>: 아무 차트 위에서 마우스를 눌러 끌면 구간이 선택됩니다. "선택 구간 분석"을 누르면 그 기간의 모델 값이 팝업으로 나옵니다. 양쪽 창에 모두 구간을 잡으면 팝업에 나란히 나옵니다.</li>
+    <li><b>구간 분석</b>: 아무 차트 위에서 마우스를 눌러 끌면 구간이 선택됩니다. "선택 구간 분석"을 누르면 팝업이 열립니다 - 위에는 그 구간만 크게 다시 그린 차트 7종(세로축도 그 구간에 맞춤), 아래에는 그 기간의 모델 값 표(제목을 누르면 접힙니다). 팝업 안의 차트를 다시 끌면 더 좁혀지고 표도 따라갑니다. "← 이전 확대"·"다음 확대 →"로 오갑니다. 양쪽 창에 모두 구간을 잡으면 표에 나란히 나옵니다(다른 창의 열은 그 창에서 고른 구간 그대로이고 차트는 누른 창의 것입니다).</li>
     <li><b>사건</b>: 첫 차트(종가)의 가로축 바로 위에 표시가 있는 날은 그날 사건이 있는 날입니다. ○ 는 나라 전체의 일(미국 연준·한국은행의 정책금리 변경일 등), ■ 는 그 창의 종목·지수의 일(실적 발표, 주주환원, 투자·계약, 정책·규제, 사고 등)입니다. 마우스를 올리면 제목이, <b>클릭하면 팝업</b>에 설명과 출처 링크가 나옵니다. 장이 쉰 날의 사건은 다음 거래일에 붙습니다. 목록은 <code>events/events.csv</code> 이고, 조사해 온 사건은 출처를 직접 열어 본 것만 "확인함"으로 표시했습니다. 1차 조사는 2017년 이후입니다.</li>
     <li>차트의 세로축은 창마다 따로 맞춥니다. 두 창의 선 높이를 직접 비교하지 말고 축의 숫자를 읽어야 합니다.</li>
   </ul>
@@ -291,11 +291,6 @@ td small,th small{color:var(--muted);font-weight:400}
 </div>
 </main>
 
-<div class="ov" id="ov"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="m_title">
-  <div class="mhead"><h2 id="m_title">선택 구간 분석</h2><button id="m_close">닫기</button></div>
-  <div class="tw"><table id="m_table"></table></div>
-  <p class="sub" style="margin-top:10px">구간 수익률은 구간 직전 거래일 종가 대비입니다. 이탈률의 기대치는 5%입니다. HMM·변화점은 사후 계산입니다. 상대 비교에 나오는 미국 쪽 값은 한국 대상 창에서는 하루 전(미국 날짜) 종가, 미국 대상 창에서는 같은 날짜 종가라서, 같은 기간이라도 두 창의 숫자가 하루치만큼 다를 수 있습니다.</p>
-</div></div>
 <div class="ov" id="ev"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="e_title">
   <div class="mhead"><h2 id="e_title">그날의 사건</h2><button id="e_close">닫기</button></div>
   <div id="e_body"></div>
@@ -306,6 +301,10 @@ td small,th small{color:var(--muted);font-weight:400}
   <div class="ctrl" style="margin:0 0 6px"><button id="z_back">← 이전 확대</button><button id="z_fwd">다음 확대 →</button><label id="z_step"></label></div>
   <p class="sub" id="z_sub"></p>
   <div id="z_body"></div>
+  <details id="z_tbl" open hidden style="margin-top:12px"><summary>구간 통계 표 (누르면 접거나 펼칩니다)</summary>
+    <div class="tw" style="margin-top:8px"><table id="z_table"></table></div>
+    <p class="sub" style="margin-top:10px">구간 수익률은 구간 직전 거래일 종가 대비입니다. 이탈률의 기대치는 5%입니다. HMM·변화점은 사후 계산입니다. 상대 비교에 나오는 미국 쪽 값은 한국 대상 창에서는 하루 전(미국 날짜) 종가, 미국 대상 창에서는 같은 날짜 종가라서, 같은 기간이라도 두 창의 숫자가 하루치만큼 다를 수 있습니다. 표는 위 차트의 구간을 따라갑니다(다른 창의 열은 그 창에서 고른 구간 그대로).</p>
+  </details>
 </div></div>
 
 <script>
@@ -579,7 +578,8 @@ function stats(S, M, i, j) {
     worst: worst.map(k => `${S.date[k]} ${pc(S.chg[k])} (${M.reg[0]} ${S.x1_ret[k] == null ? '-' : pc(Math.expm1(S.x1_ret[k] / 100) * 100)}, 배수 ${sg(2)(S.gz[k])})`),
   };
 }
-function openModal(sels) {
+// 구간 통계 표의 HTML. 여는 것은 확대 팝업(openZoom)이 한다 - 탭 1 의 "선택 구간 분석"은 그 팝업의 위에 차트, 아래에 이 표다.
+function statsTable(sels) {
   const st = sels.map(s => stats(ALL[s.key].R.series, ALL[s.key].R.meta, s.a, s.b)), rows = [];
   const row = (name, f, wrap) => rows.push(`<tr><td>${name}</td>${st.map(s => `<td${wrap ? ' class="wrap"' : ''}>${f(s)}</td>`).join('')}</tr>`);
   const grp = name => rows.push(`<tr class="grp"><td colspan="${st.length + 1}">${name}</td></tr>`);
@@ -600,11 +600,9 @@ function openModal(sels) {
   row('고유분 누적(로그 %)', s => s.abn);
   grp('가장 크게 빠진 날');
   [0, 1, 2].forEach(k => row(`${k + 1}번째`, s => s.worst[k] || '-', true));
-  document.getElementById('m_table').innerHTML =
-    `<tr><th></th>${sels.map(s => `<th>${s.label}</th>`).join('')}</tr>` + rows.join('');
-  document.getElementById('ov').classList.add('on');
+  return `<tr><th></th>${sels.map(s => `<th>${s.label}</th>`).join('')}</tr>` + rows.join('');
 }
-// 팝업은 둘이다: 탭 1 의 구간 분석(ov), 탭 3·4 의 확대 보기(zv). 닫는 길(닫기 단추, 바깥 누르기, Esc)은 같다.
+// 팝업은 둘이다: 확대 보기(zv - 탭 1 의 구간 분석도 이것이다), 사건(ev). 닫는 길(닫기 단추, 바깥 누르기, Esc)은 같다.
 // 사건 팝업(탭 1). 글은 events.csv 에서 온 것(조사해 온 줄 포함)이라 전부 esc 를 거치고, 출처는 http(s) 주소일 때만 링크로 만든다.
 const evWho = e => e.asset ? (ALL[e.asset] ? ALL[e.asset].R.meta.name : e.asset) : e.country === 'US' ? '미국' : e.country === 'KR' ? '한국' : e.country;
 function openEvents(date, list) {
@@ -656,9 +654,9 @@ class Pane {
     u.last1y.onclick = () => { u.year.value = ''; u.month.value = '';
       const d = new Date(S.date[N - 1]); d.setFullYear(d.getFullYear() - 1); this.setRange(find(d.toISOString().slice(0, 10)), N - 1); };
     u.clear.onclick = () => this.setSel(null);
-    u.go.onclick = () => { // 누른 창을 앞에, 다른 창에도 선택이 있으면 나란히
+    u.go.onclick = () => { // 누른 창의 차트를 확대 팝업에, 표에는 다른 창의 선택 구간도 나란히
       const other = Object.values(panes).find(p => p !== this && p.sel && !document.getElementById('panes').classList.contains('single'));
-      openModal([this, other].filter(Boolean).map(p => ({a: p.a + p.sel[0], b: p.a + p.sel[1], key: p.key, label: `${p.label} 창 · ${p.M.name}`})));
+      openZoom(this.zoomMake(other), this.a + this.sel[0], this.a + this.sel[1], false);
     };
     u.year.value = year; this.fromYearMonth();
   }
@@ -702,10 +700,31 @@ class Pane {
             + (this.cut ? ` · ${this.M.name} 자료는 ${this.M.start} 부터라 그 앞은 뺐습니다` : '');
   }
   render() {
-    const {a, b, S, M} = this, pf = pfmt(M), sl = k => S[k].slice(a, b + 1), dates = sl('date'), n = dates.length;
-    if (this.empty) { this.charts = [];
-      this.ui.charts.innerHTML = `<div class="gap">${M.name} 자료는 ${M.start} 부터 있습니다(상장한 뒤 계수 추정에 쓸 2년이 지난 해부터). 연도를 그 뒤로 고르거나 다른 대상을 고르세요.</div>`;
+    const box = this.ui.charts, M = this.M; box.innerHTML = ''; this.charts = [];
+    if (this.empty) {
+      box.innerHTML = `<div class="gap">${M.name} 자료는 ${M.start} 부터 있습니다(상장한 뒤 계수 추정에 쓸 2년이 지난 해부터). 연도를 그 뒤로 고르거나 다른 대상을 고르세요.</div>`;
       return this.setSel(null); }
+    const onBrush = (i, j) => this.setSel(i == null ? null : [i, j]);
+    this.items(this.a, this.b).forEach(it => {
+      const t = document.createElement('div'); t.className = 'ctitle'; t.textContent = it.title; box.appendChild(t);
+      const h = document.createElement('div'); box.appendChild(h);
+      if (it.gap) { h.className = 'gap'; h.textContent = it.gap; if (it.h) h.style.minHeight = it.h + 'px'; return; }
+      this.charts.push(chart(h, {...it.cfg, onBrush}));
+    });
+    this.setSel(null);
+  }
+  /* "선택 구간 분석" 팝업의 내용. 확대 팝업(openZoom)의 make 규약이다: 구간 a..b 의 차트 묶음(이 창의 7종, 더 좁힐 수 있다)과 아래 표.
+     표에는 다른 창(other)에 선택이 있으면 그 창의 선택 구간을 나란히 적는다 - 그 열은 좁혀도 안 바뀐다(두 창은 서로 다른 때를 견주는 것이라서). */
+  zoomMake(other) {
+    const sel = p => ({a: p.a + p.sel[0], b: p.a + p.sel[1], key: p.key, label: `${p.label} 창 · ${p.M.name}`});
+    return (a, b, zoom) => ({title: '선택 구간 분석', items: this.items(a, b, true).map(it => ({...it, abs: (i, j) => [a + i, a + j]})),
+      sub: `${this.label} 창 · ${this.M.name} · ${S.date[a]} ~ ${S.date[b]} (${b - a + 1}거래일) · 차트 위를 다시 끌면 더 좁혀지고 아래 표도 따라갑니다 · Esc 나 바깥을 누르면 닫힙니다`,
+      table: statsTable([{a, b, key: this.key, label: `${this.label} 창 · ${this.M.name}`}, ...(other ? [{...sel(other), label: sel(other).label + ' (그 창의 선택 구간)'}] : [])])});
+  }
+  // 차트 7종의 설정(제목 + chart 의 cfg). 화면(render)과 "선택 구간 분석" 팝업(zoomMake)이 같이 쓴다 - 따로 만들면 팝업의 선이 화면과 달라진다.
+  // 자료가 없는 차트는 gap(안내 글)으로 자리를 남긴다. zoom 이면 차트를 더 높게.
+  items(a, b, zoom) {
+    const {S, M} = this, pf = pfmt(M), sl = k => S[k].slice(a, b + 1), dates = sl('date'), n = dates.length, items = [];
     // 누적은 값이 처음 나온 날부터 그린다. 그 앞을 0 으로 그리면 자료가 없는 기간이 '순매수 0'으로 보인다
     const cum = k => { let s = 0, on = false; return sl(k).map(v => (on ||= v != null) ? (s += v ?? 0) : null); };
     // 창의 첫날에 값이 없는 비교선(그때 상장 전)은 100 으로 맞출 기준이 없어 그리지 않는다
@@ -713,16 +732,12 @@ class Pane {
     const vlines = []; sl('cp').forEach((v, i) => { if (v) vlines.push({i, label: '변화점 ' + dates[i].slice(5)}); });
     // 사건: 이 창의 종목 것과 나라 전체의 것만. 다른 종목의 사건은 이 창에 안 보인다
     const evs = dates.map((_, i) => { const l = EV_AT[a + i]; if (!l) return null; const f = l.filter(e => !e.asset || e.asset === this.key); return f.length ? f : null; });
-    const onBrush = (i, j) => this.setSel(i == null ? null : [i, j]);
-    const box = this.ui.charts; box.innerHTML = ''; this.charts = [];
-    const add = (title, cfg) => { const t = document.createElement('div'); t.className = 'ctitle'; t.textContent = title; box.appendChild(t);
-      const h = document.createElement('div'); box.appendChild(h); this.charts.push(chart(h, {dates, onBrush, ...cfg})); };
+    const add = (title, cfg) => items.push({title, cfg: {dates, ...cfg, h: (cfg.h || 220) + (zoom ? 80 : 0)}});
     const ix = v => v.toFixed(0), tstrip = {name: '추세', vals: sl('trend'), map: TREND};
     // 3년(756거래일)보다 길게 보면 가격을 로그 눈금으로 그린다. 그냥 눈금이면 수십 배 오른 대상은 앞쪽 20년이 바닥에 붙은 선이 된다.
     const long = n > 756, lg = long ? ', 로그 눈금' : '';
     // 자료가 없는 차트도 자리는 남긴다. 빼 버리면 두 창의 차트 줄이 어긋나서 나란히 보기 어렵다.
-    const gap = (title, why, h) => { const t = document.createElement('div'); t.className = 'ctitle'; t.textContent = title; box.appendChild(t);
-      const g = document.createElement('div'); g.className = 'gap'; g.textContent = why; if (h) g.style.minHeight = h + 'px'; box.appendChild(g); };
+    const gap = (title, why, h) => items.push({title, gap: why, h});
     add(`${M.name} 종가·이동평균·변화점${M.unit ? ` (${M.unit}${lg})` : lg && ` (${lg.slice(2)})`}`, {fmt: paxis(M), h: 240, log: long, vlines, events: evs, onEvent: i => openEvents(dates[i], evs[i]), strips: [tstrip, {name: '국면', vals: sl('regime'), map: REG}], lines: [
       {name: '종가', vals: [sl('close')], color: '--ink', fmt: pf, w: 1.8},
       {name: '20일선', vals: [sl('ma20')], color: '--s1', fmt: pf, w: 1.4},
@@ -754,7 +769,7 @@ class Pane {
       {name: '고유분 누적', vals: [cum('abn')], color: '--s1', fmt: sg(1)}],
       extraTip: [{name: '그날 고유분', vals: sl('abn'), fmt: sg(2)}]});
     else gap(`${M.name} 고유분 누적`, `이 기간에는 고유분이 없습니다 - 설명 변수(${M.reg.join('·')})의 직전 2년 자료가 부족합니다.`, 198);
-    this.setSel(null);
+    return items;
   }
 }
 function drawOverview() {
@@ -897,6 +912,7 @@ function drawSet(box, items, make) {
   items.forEach(it => {
     const t = document.createElement('div'); t.className = 'ctitle'; t.textContent = it.title; box.appendChild(t);
     const h = document.createElement('div'); box.appendChild(h);
+    if (it.gap) { h.className = 'gap'; h.textContent = it.gap; if (it.h) h.style.minHeight = it.h + 'px'; return; }  // 자료 없는 자리(탭 1)
     // 끄는 동안에는 고른 자리만 칠하고, 놓으면 팝업을 연다. 끌지 않고 누르기만 하면(i 가 null) 아무 일도 없다.
     const c = chart(h, {...it.cfg, onBrush: (i, j, live) => { c.setSel(live ? i : null, j);
       if (!live && i != null) openZoom(make, ...it.abs(i, j), box === gui('z_body')); }});
@@ -905,7 +921,9 @@ function drawSet(box, items, make) {
 // 창 크기가 바뀌어도, 이전·다음으로 옮겨도 이것 하나로 다시 그린다
 function zoomDraw() {
   const [a, b] = zHist[zAt], set = zMake(a, b, true);
-  gui('z_sub').textContent = set.sub;
+  gui('z_sub').textContent = set.sub; gui('z_title').textContent = set.title || '확대 보기';
+  // 표는 주는 탭(탭 1)만. 접힘 상태는 사용자가 정한 대로 둔다(details 의 open 을 건드리지 않는다)
+  gui('z_tbl').hidden = !set.table; if (set.table) gui('z_table').innerHTML = set.table;
   gui('z_back').disabled = zAt < 1; gui('z_fwd').disabled = zAt > zHist.length - 2;
   gui('z_step').textContent = `확대 ${zAt + 1} / ${zHist.length}단계`;
   drawSet(gui('z_body'), set.items, zMake);

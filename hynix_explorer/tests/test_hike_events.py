@@ -119,7 +119,8 @@ class Events(unittest.TestCase):
         events.write_events([{"date": "2020-01-02", "country": "KR", "category": "policy", "title": "손으로 적음", "summary": "", "source": "", "checked": "yes"},
                              {"date": "2019-01-01", "country": "US", "category": "rate", "title": "옛 자동 줄", "summary": "", "source": "BIS", "checked": "auto"}])
         rates = {"areas": {"US": {"steps": [["2019-12-01", 1.5], ["2020-03-03", 1.0]]}, "KR": {"steps": [["2019-12-01", 1.25]]}}}
-        with mock.patch.object(events, "rate_data", lambda: rates), mock.patch.object(events, "load_sec", dict):  # 공시 없이
+        with mock.patch.object(events, "rate_data", lambda: rates), mock.patch.object(events, "load_sec", dict), \
+                mock.patch.object(events, "load_dart", dict):  # 공시 없이
             events.main()
         rows = events.load_events()
         self.assertEqual([(r["date"], r["title"], r["checked"]) for r in rows],
@@ -139,12 +140,23 @@ class Events(unittest.TestCase):
         self.assertEqual(rows[1]["source"], "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000080/b.htm")
         self.assertEqual((rows[1]["asset"], rows[1]["country"], rows[1]["checked"]), ("nvidia", "US", "auto"))
 
+    def test_dart_rows_classify_by_title_words_and_skip_the_rest(self):
+        dart = {"hynix": [{"date": "2026-10-28", "no": "20261028000001", "name": "연결재무제표기준영업(잠정)실적(공정공시)", "ty": "I"},
+                          {"date": "2026-10-28", "no": "20261028000002", "name": "주요사항보고서(자기주식취득결정)", "ty": "B"},
+                          {"date": "2026-10-14", "no": "20261014000003", "name": "기업설명회(IR)개최(안내공시)", "ty": "I"}]}
+        rows = events.dart_rows(dart)
+        self.assertEqual([(r["category"], r["title"]) for r in rows],
+                         [("earnings", "SK하이닉스 공시: 연결재무제표기준영업(잠정)실적(공정공시)"), ("shareholder", "SK하이닉스 공시: 주요사항보고서(자기주식취득결정)")])
+        self.assertEqual(rows[0]["source"], "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20261028000001")
+        self.assertEqual((rows[0]["country"], rows[0]["asset"], rows[0]["checked"]), ("KR", "hynix", "auto"))
+
     def test_rewrite_drops_researched_earnings_rows_that_a_filing_covers(self):
         events.write_events([{"date": "2026-11-17", "country": "US", "asset": "nvidia", "category": "earnings", "title": "조사한 실적", "checked": ""},
                              {"date": "2026-11-17", "country": "US", "asset": "nvidia", "category": "business", "title": "같은 날 다른 사건", "checked": ""},
                              {"date": "2026-08-26", "country": "US", "asset": "nvidia", "category": "earnings", "title": "공시가 없는 날의 실적", "checked": ""}])
         rates = {"areas": {"US": {"steps": [["2019-12-01", 1.5]]}, "KR": {"steps": [["2019-12-01", 1.25]]}}}
-        with mock.patch.object(events, "rate_data", lambda: rates), mock.patch.object(events, "load_sec", lambda: self.SEC):
+        with mock.patch.object(events, "rate_data", lambda: rates), mock.patch.object(events, "load_sec", lambda: self.SEC), \
+                mock.patch.object(events, "load_dart", dict):
             events.main()
         self.assertEqual([(r["date"], r["title"]) for r in events.load_events()],
                          [("2026-08-26", "공시가 없는 날의 실적"), ("2026-11-17", "같은 날 다른 사건"), ("2026-11-17", "엔비디아 공시(8-K): 실적 발표"),

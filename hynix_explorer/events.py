@@ -1,6 +1,6 @@
 """날짜별 경제 이슈 표 events/events.csv (P014-013). 탭 1 "기간 비교"의 종가 차트에 마우스를 올리면 그날 이슈가 나온다.
 
-    python events.py              자동 줄(미국·한국 정책금리 변경일 - BIS, 미국 종목의 8-K 공시 - SEC)을 다시 뽑아 쓴다. 조사해 온 줄은 그대로 둔다
+    python events.py              자동 줄(미국·한국 정책금리 변경일 - BIS, 미국 종목의 8-K 공시 - SEC, 한국 종목의 공시 - DART)을 다시 뽑아 쓴다. 조사해 온 줄은 그대로 둔다
                                   단, 조사해 온 실적 발표 줄은 같은 날 같은 종목의 8-K 실적 공시(자동)가 있으면 지운다 - 공시가 확인된 날짜다
     python events.py add <csv>    조사해 온 줄(같은 열)을 합친다. 날짜·나라·종목·제목이 빠졌거나 종목 키가 없는 줄은 받지 않고 알린다. 같은 (날짜, 종목, 제목)은 한 번만
 
@@ -51,6 +51,35 @@ def auto_rows(rates):
     return sorted(rows, key=lambda r: (r["date"], r["country"]))
 
 
+# DART 공시 제목의 낱말 -> 분류. 앞의 것이 우선. 어느 것에도 안 걸리는 공시(IR 안내, 풍문 해명, 주주총회 소집, 조회공시 등)는 싣지 않는다 - 잦고 뜻이 없다.
+DART_WORDS = [("earnings", ("잠정)실적", "잠정실적", "영업실적")),
+              ("shareholder", ("배당", "자기주식", "주식소각", "기업가치제고", "주주환원", "무상증자", "액면분할", "주식분할")),
+              ("business", ("공급계약", "신규시설투자", "타법인주식", "유상증자", "합병", "분할", "영업양수", "영업양도", "해외증권시장", "전환사채", "교환사채", "신주인수권", "자산양수", "자산양도")),
+              ("people", ("대표이사", "최대주주")),
+              ("incident", ("소송", "영업정지", "화재", "제재", "행정처분", "거래정지", "회생"))]
+
+
+def load_dart():
+    """fetch.py dart 가 받은 공시 목록. 키가 없어 안 받았으면 빈 것."""
+    p = D / "dart_list.json"
+    return json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+
+
+def dart_rows(dart):
+    """DART 공시 한 줄씩. 제목의 낱말로 분류한다(DART_WORDS). 출처는 DART 의 공시 열람 주소(접수번호)."""
+    rows = []
+    for key, filings in dart.items():
+        a = ASSETS[key]
+        for f in filings:
+            cat = next((c for c, words in DART_WORDS if any(w in f["name"] for w in words)), None)
+            if not cat:
+                continue
+            rows.append({"date": f["date"], "country": "KR", "asset": key, "category": cat, "title": f"{a['name']} 공시: {f['name']}",
+                         "summary": f"전자공시(DART) {'주요사항보고' if f['ty'] == 'B' else '거래소공시'} 접수번호 {f['no']}. 글은 출처에서 본다",
+                         "source": f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={f['no']}", "checked": "auto"})
+    return rows
+
+
 def load_sec():
     """fetch.py sec 가 받은 8-K 목록. 아직 안 받았으면 빈 것(그러면 자동 줄은 금리 변경일뿐이다)."""
     p = D / "sec_8k.json"
@@ -75,8 +104,8 @@ def sec_rows(sec):
     return rows
 
 
-def auto_rows_all(rates, sec):
-    return sorted(auto_rows(rates) + sec_rows(sec), key=lambda r: (r["date"], r["country"], r["asset"]))
+def auto_rows_all(rates, sec, dart):
+    return sorted(auto_rows(rates) + sec_rows(sec) + dart_rows(dart), key=lambda r: (r["date"], r["country"], r["asset"]))
 
 
 def load_events():
@@ -142,12 +171,12 @@ def main():
         print(f"{sys.argv[2]}: {len(new)}줄 중 {added}줄 더함, {len(bad)}줄 받지 않음, 나머지는 이미 있던 줄 -> 전체 {len(rows)}줄")
         return
     manual = [r for r in load_events() if r["checked"] != "auto"]
-    auto = auto_rows_all(rate_data(), load_sec())
+    auto = auto_rows_all(rate_data(), load_sec(), load_dart())
     # 조사해 온 실적 발표 줄은 공시가 같은 날 있으면 공시 쪽만 남긴다. 조사 줄은 기억에서 나온 날짜가 많고 공시는 확인된 날짜다
     known = {(r["asset"], r["date"]) for r in auto if r["category"] == "earnings"}
     kept = [r for r in manual if not (r["category"] == "earnings" and (r["asset"], r["date"]) in known)]
     write_events(sorted(kept + auto, key=lambda r: (r["date"], r["country"], r["asset"])))
-    print(f"{EV}: 자동 {len(auto)}줄(금리 변경일 {EV_FROM} 부터 + 8-K 공시) + 조사해 온 {len(kept)}줄"
+    print(f"{EV}: 자동 {len(auto)}줄(금리 변경일 {EV_FROM} 부터 + 8-K 공시 + DART 공시) + 조사해 온 {len(kept)}줄"
           + (f" (실적 발표 {len(manual) - len(kept)}줄은 같은 날 공시가 있어 뺐다)" if len(kept) < len(manual) else ""))
 
 
