@@ -21,9 +21,9 @@ ASSETS = {
               "reg": ["kospi", "sox"], "cmp": ["samsung", "sox", "kospi"]},
     "kospi": {"group": "한국 반도체·지수", "name": "코스피", "market": "kr", "kind": "index", "code": "KOSPI",
               "reg": ["spx", "sox"], "cmp": ["hynix", "samsung", "sox"]},
-    "nvidia": {"group": "미국 반도체·지수", "name": "엔비디아", "market": "us", "kind": "stock", "code": "NVDA",
+    "nvidia": {"group": "미국 반도체·지수", "name": "엔비디아", "market": "us", "kind": "stock", "code": "NVDA", "cik": 1045810,
                "reg": ["spx", "sox"], "cmp": ["nasdaq", "micron", "hynix"]},
-    "micron": {"group": "미국 반도체·지수", "name": "마이크론", "market": "us", "kind": "stock", "code": "MU",
+    "micron": {"group": "미국 반도체·지수", "name": "마이크론", "market": "us", "kind": "stock", "code": "MU", "cik": 723125,
                "reg": ["spx", "sox"], "cmp": ["hynix", "samsung", "sox"]},
     "nasdaq": {"group": "미국 반도체·지수", "name": "나스닥 종합", "market": "us", "kind": "index", "code": "^IXIC",
                "reg": ["spx", "sox"], "cmp": ["nvidia", "sox", "kospi"]},
@@ -42,16 +42,17 @@ ASSETS = {
     "doosan": {"group": "한국 조선·방산·원전", "name": "두산에너빌리티", "market": "kr", "kind": "stock", "code": "034020",
                "reg": ["kospi", "spx"], "cmp": ["hynix", "sox", "kospi"]},
     # 미국 헬스케어: 제약·의료기기·보험에서 시가총액이 큰 것 하나씩(순위는 확인 안 함).
-    "lilly": {"group": "미국 헬스케어", "name": "일라이 릴리", "market": "us", "kind": "stock", "code": "LLY",
+    "lilly": {"group": "미국 헬스케어", "name": "일라이 릴리", "market": "us", "kind": "stock", "code": "LLY", "cik": 59478,
               "reg": ["spx", "nasdaq"], "cmp": ["nasdaq", "nvidia", "kospi"]},
-    "jnj": {"group": "미국 헬스케어", "name": "존슨앤드존슨", "market": "us", "kind": "stock", "code": "JNJ",
+    "jnj": {"group": "미국 헬스케어", "name": "존슨앤드존슨", "market": "us", "kind": "stock", "code": "JNJ", "cik": 200406,
             "reg": ["spx", "nasdaq"], "cmp": ["nasdaq", "nvidia", "kospi"]},
-    "unh": {"group": "미국 헬스케어", "name": "유나이티드헬스", "market": "us", "kind": "stock", "code": "UNH",
+    "unh": {"group": "미국 헬스케어", "name": "유나이티드헬스", "market": "us", "kind": "stock", "code": "UNH", "cik": 731766,
             "reg": ["spx", "nasdaq"], "cmp": ["nasdaq", "nvidia", "kospi"]},
 }
 # 비교선·팝업의 "상대 비교" 줄에 나오는 것들. template.html 의 ENT 와 같은 목록이어야 한다.
 # 대상 전부를 넣으면 대상마다 열이 대상 수만큼 붙어 파일이 대상 수의 제곱으로 커진다.
 CMP_ENT = ["hynix", "samsung", "semco", "kospi", "nvidia", "micron", "nasdaq", "sox"]
+# 미국 종목의 cik 는 SEC EDGAR 의 회사 번호다(공시 목록을 받는 열쇠. fetch.py sec). 지수에는 없다.
 # 대상은 아니고 설명 변수·비교선으로만 쓰는 미국 지수
 BENCH = {"sox": "^SOX", "spx": "^GSPC"}
 NAMES = {**{k: a["name"] for k, a in ASSETS.items()}, "sox": "SOX", "spx": "S&P500"}

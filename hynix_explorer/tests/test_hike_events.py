@@ -119,7 +119,7 @@ class Events(unittest.TestCase):
         events.write_events([{"date": "2020-01-02", "country": "KR", "category": "policy", "title": "손으로 적음", "summary": "", "source": "", "checked": "yes"},
                              {"date": "2019-01-01", "country": "US", "category": "rate", "title": "옛 자동 줄", "summary": "", "source": "BIS", "checked": "auto"}])
         rates = {"areas": {"US": {"steps": [["2019-12-01", 1.5], ["2020-03-03", 1.0]]}, "KR": {"steps": [["2019-12-01", 1.25]]}}}
-        with mock.patch.object(events, "rate_data", lambda: rates):
+        with mock.patch.object(events, "rate_data", lambda: rates), mock.patch.object(events, "load_sec", dict):  # 공시 없이
             events.main()
         rows = events.load_events()
         self.assertEqual([(r["date"], r["title"], r["checked"]) for r in rows],
@@ -127,6 +127,28 @@ class Events(unittest.TestCase):
 
     def test_missing_file_is_an_empty_list(self):
         self.assertEqual(events.load_events(), [])
+
+    SEC = {"nvidia": [{"acc": "0001045810-26-000090", "date": "2026-11-23", "report": "2026-11-22", "form": "8-K", "items": "5.02,9.01", "doc": "a.htm"},
+                      {"acc": "0001045810-26-000080", "date": "2026-11-17", "report": "2026-11-17", "form": "8-K", "items": "2.02,9.01", "doc": "b.htm"},
+                      {"acc": "0001045810-26-000070", "date": "2026-09-03", "report": "", "form": "8-K", "items": "7.01,9.01", "doc": "c.htm"}]}
+
+    def test_sec_rows_classify_by_item_and_skip_press_release_only_filings(self):
+        rows = events.sec_rows(self.SEC)
+        self.assertEqual([(r["date"], r["category"]) for r in rows], [("2026-11-23", "people"), ("2026-11-17", "earnings")])
+        self.assertEqual(rows[1]["title"], "엔비디아 공시(8-K): 실적 발표")
+        self.assertEqual(rows[1]["source"], "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000080/b.htm")
+        self.assertEqual((rows[1]["asset"], rows[1]["country"], rows[1]["checked"]), ("nvidia", "US", "auto"))
+
+    def test_rewrite_drops_researched_earnings_rows_that_a_filing_covers(self):
+        events.write_events([{"date": "2026-11-17", "country": "US", "asset": "nvidia", "category": "earnings", "title": "조사한 실적", "checked": ""},
+                             {"date": "2026-11-17", "country": "US", "asset": "nvidia", "category": "business", "title": "같은 날 다른 사건", "checked": ""},
+                             {"date": "2026-08-26", "country": "US", "asset": "nvidia", "category": "earnings", "title": "공시가 없는 날의 실적", "checked": ""}])
+        rates = {"areas": {"US": {"steps": [["2019-12-01", 1.5]]}, "KR": {"steps": [["2019-12-01", 1.25]]}}}
+        with mock.patch.object(events, "rate_data", lambda: rates), mock.patch.object(events, "load_sec", lambda: self.SEC):
+            events.main()
+        self.assertEqual([(r["date"], r["title"]) for r in events.load_events()],
+                         [("2026-08-26", "공시가 없는 날의 실적"), ("2026-11-17", "같은 날 다른 사건"), ("2026-11-17", "엔비디아 공시(8-K): 실적 발표"),
+                          ("2026-11-23", "엔비디아 공시(8-K): 임원·이사 변경")])
 
 
 class Layout(unittest.TestCase):

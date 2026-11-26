@@ -303,6 +303,43 @@ class Rates(Base):
         self.assertEqual(f.read_text(encoding="utf-8"), "멀쩡한 파일")
 
 
+class Sec(Base):
+    """SEC 공시 목록에서 8-K 만, 첫해 뒤만, 옛 파일까지 합쳐 받는지. 응답은 열마다 배열인 JSON 이다(2026-11-26 에 확인한 모양)."""
+
+    def page(self, rows, files=()):
+        cols = ("accessionNumber", "filingDate", "reportDate", "form", "items", "primaryDocument")
+        return {"filings": {"recent": {c: [r[i] for r in rows] for i, c in enumerate(cols)}, "files": [{"name": f} for f in files]}}
+
+    def run_sec(self, pages, status=200):
+        def get(url, **kw):
+            name = url.rsplit("/", 1)[-1]
+            return Resp(pages.get(name, {}), status if name in pages else 404)
+        with mock.patch.object(fetch, "ASSETS", {"nvidia": {"name": "엔비디아", "cik": 1045810}, "kospi": {"name": "코스피"}}), \
+                mock.patch.object(fetch.requests, "get", get):
+            fetch.sec()
+        import json
+        return json.loads((self.out / "sec_8k.json").read_text(encoding="utf-8"))
+
+    RECENT = [("0001-26-2", "2026-11-17", "2026-11-17", "8-K", "2.02,9.01", "b.htm"), ("0001-26-1", "2026-10-01", "", "10-Q", "", "q.htm")]
+    OLD = [("0001-98-1", "1998-03-06", "", "8-K", "5.02", "o.htm"), ("0001-96-1", "1996-03-06", "", "8-K", "5.02", "z.htm")]
+
+    def test_keeps_only_8k_after_the_first_year_including_older_files(self):
+        got = self.run_sec({"CIK0001045810.json": self.page(self.RECENT, ["CIK0001045810-submissions-001.json"]),
+                            "CIK0001045810-submissions-001.json": self.page(self.OLD)["filings"]["recent"]})  # 옛 파일은 열 묶음만 있다
+        self.assertEqual(list(got), ["nvidia"])  # cik 가 없는 대상(지수)은 건너뛴다
+        self.assertEqual([(r["date"], r["items"]) for r in got["nvidia"]], [("1998-03-06", "5.02"), ("2026-11-17", "2.02,9.01")])
+
+    def test_error_status_or_missing_column_raises_and_keeps_the_file(self):
+        f = self.out / "sec_8k.json"
+        f.write_text("멀쩡한 파일", encoding="utf-8")
+        with self.assertRaises(RuntimeError):
+            self.run_sec({"CIK0001045810.json": self.page(self.RECENT)}, status=503)
+        page = self.page(self.RECENT); del page["filings"]["recent"]["items"]
+        with self.assertRaises(RuntimeError):
+            self.run_sec({"CIK0001045810.json": page})
+        self.assertEqual(f.read_text(encoding="utf-8"), "멀쩡한 파일")
+
+
 class Cpi(Base):
     """BIS 소비자물가 묶음 파일에서 월별 상승률 줄만 뽑는지. 한 줄이 (주기, 나라, 단위) 하나, 열이 달이다(2026-11-26 에 받은 파일의 모양)."""
     MONTHS = pd.period_range("1990-01", "2012-12", freq="M").strftime("%Y-%m")

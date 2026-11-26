@@ -8,9 +8,10 @@
       python fetch.py flow --full  (종목 수급을 처음부터 다시 받는다. 평소에는 새로 생긴 날만 받는다)
       python fetch.py --today      (18시 전이라도 오늘 한국 장까지 받는다. 15:40 부터)
       python fetch.py rates cpi    (주요국 정책금리와 소비자물가만. 국제결제은행 BIS)
+      python fetch.py sec          (미국 종목의 8-K 공시 목록만. SEC EDGAR)
 보통은 직접 부르지 않고 update.py 가 부른다. 하나라도 실패하면 종료 코드 1 로 끝난다(update.py 가 거기서 멈춘다).
 어디서 무엇을 받는지와 그 규칙은 프로젝트의 plan/specs/data-collection-policy.md 가 정한다(이 파일은 그것을 따른다).
-로그인·키가 필요한 출처는 쓰지 않는다.
+로그인이 필요한 출처는 쓰지 않는다. 무료 키가 필요한 출처는 키를 환경변수에서만 읽는다(코드·문서·git 에 넣지 않는다).
 """
 import io
 import json
@@ -50,6 +51,12 @@ BIS = "https://data.bis.org/static/bulk/WS_CBPOL_csv_col.zip"
 # 단위는 둘이다: 771 = 전년 같은 때 대비 %, 628 = 지수(2010 = 100). 부호만 믿지 않고 옆 칸의 글도 같이 본다(cpi).
 BIS_CPI = "https://data.bis.org/static/bulk/WS_LONG_CPI_csv_col.zip"
 CPI_YOY = ("771", "Year-on-year changes, in per cent")
+# SEC EDGAR 의 회사별 공시 목록(JSON). 최근 1,000건은 CIK<번호>.json 에, 그 앞은 같은 응답의 files 가 가리키는 파일들에 있다.
+# SEC 는 User-Agent 가 없으면 403 을 준다. 연락처를 적으라고 하지만 개인정보라 넣지 않는다 - 이 이름만으로 받아졌다(2026-11-26 확인).
+SEC = "https://data.sec.gov/submissions/"
+SEC_HEAD = {"User-Agent": "hynix-explorer research tool", "Accept-Encoding": "gzip"}
+SEC_FROM = "1997-01-01"  # 탐색기의 첫해
+SEC_COLS = {"accessionNumber": "acc", "filingDate": "date", "reportDate": "report", "form": "form", "items": "items", "primaryDocument": "doc"}
 STOCKS = {k: a["code"] for k, a in ASSETS.items() if a["market"] == "kr" and a["kind"] == "stock"}
 KR = {k: a["code"] for k, a in ASSETS.items() if a["market"] == "kr"}
 US = {k: a["code"] for k, a in ASSETS.items() if a["market"] == "us"}
@@ -305,7 +312,46 @@ def cpi():
     print("bis_cpi", len(out), out.index.min(), "~", out.index.max(), f"({len(RATES)}개 나라)", "가장 늦게 온 나라", ends.idxmin(), ends.min())
 
 
-JOBS = {f.__name__: f for f in (kr_price, us, flow, kospi_flow, now, rates, cpi)}
+def sec_page(url):
+    r = requests.get(url, headers=SEC_HEAD, timeout=60)
+    if r.status_code != 200:
+        raise RuntimeError(f"SEC {url.rsplit('/', 1)[-1]} 상태 {r.status_code}")
+    time.sleep(0.2)  # SEC 는 초당 10건까지라고 적어 두었다(원칙 4)
+    return r.json()
+
+
+def sec_rows(rec):
+    """공시 목록 한 덩어리(열마다 배열)를 줄 목록으로. 필요한 열이 빠져 있으면 모양이 바뀐 것이라 멈춘다."""
+    lost = [c for c in SEC_COLS if c not in rec]
+    if lost:
+        raise RuntimeError(f"SEC 공시 목록에 열이 없다: {lost}")
+    return [dict(zip(SEC_COLS.values(), vals)) for vals in zip(*(rec[c] for c in SEC_COLS))]
+
+
+def sec():
+    """미국 종목의 8-K 공시 목록(SEC EDGAR). 8-K 는 수시 공시다 - 항목 번호로 무엇인지 안다(2.02 실적 발표, 5.02 임원 변경, 1.01 중요 계약 ...).
+
+    assets.ASSETS 에 cik 가 있는 종목마다 전체 목록을 받아 8-K 만, SEC_FROM 뒤만 남겨 sec_8k.json 에 둔다(종목 키 -> 줄 목록, 날짜 순).
+    매번 전체를 다시 받는다 - 종목당 요청 2~3개, 전부 1MB 남짓이다. events.py 가 이 파일로 사건 표의 자동 줄을 만든다.
+    공시의 글은 받지 않는다. 항목 번호와 날짜, 문서 주소만 받는다.
+    """
+    out = {}
+    for key, a in ASSETS.items():
+        if not a.get("cik"):
+            continue
+        j = sec_page(f"{SEC}CIK{a['cik']:010d}.json")
+        rows = sec_rows(j["filings"]["recent"])
+        for f in j["filings"].get("files", []):
+            rows += sec_rows(sec_page(SEC + f["name"]))
+        rows = sorted((r for r in rows if r["form"] == "8-K" and r["date"] >= SEC_FROM), key=lambda r: r["date"])
+        if not rows:  # 8-K 가 하나도 없는 상장사는 없다. 빈 채 저장하면 그 종목의 사건이 말없이 사라진다
+            raise RuntimeError(f"SEC {a['name']}: 8-K 공시가 하나도 안 왔다")
+        out[key] = rows
+    (OUT / "sec_8k.json").write_text(json.dumps(out, ensure_ascii=False, indent=0), encoding="utf-8")
+    print("sec_8k", {k: f"{len(v)}건 ~{v[-1]['date']}" for k, v in out.items()})
+
+
+JOBS = {f.__name__: f for f in (kr_price, us, flow, kospi_flow, now, rates, cpi, sec)}
 if __name__ == "__main__":  # 테스트가 이 파일을 불러올 때는 받지 않는다
     if "--today" in sys.argv and datetime.now().strftime("%H:%M") < "15:40":
         # 장중 가격이 오늘 종가인 것처럼 저장된다. 15:30 마감 뒤 종가가 올라올 틈을 두고 받는다

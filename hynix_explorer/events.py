@@ -1,6 +1,7 @@
 """날짜별 경제 이슈 표 events/events.csv (P014-013). 탭 1 "기간 비교"의 종가 차트에 마우스를 올리면 그날 이슈가 나온다.
 
-    python events.py              미국·한국 정책금리 변경일을 BIS 자료에서 다시 뽑아 쓴다. 손으로 적은 줄은 그대로 둔다
+    python events.py              자동 줄(미국·한국 정책금리 변경일 - BIS, 미국 종목의 8-K 공시 - SEC)을 다시 뽑아 쓴다. 조사해 온 줄은 그대로 둔다
+                                  단, 조사해 온 실적 발표 줄은 같은 날 같은 종목의 8-K 실적 공시(자동)가 있으면 지운다 - 공시가 확인된 날짜다
     python events.py add <csv>    조사해 온 줄(같은 열)을 합친다. 날짜·나라·종목·제목이 빠졌거나 종목 키가 없는 줄은 받지 않고 알린다. 같은 (날짜, 종목, 제목)은 한 번만
 
 열: date(YYYY-MM-DD), country(US/KR), asset(assets.py 의 종목 키. 빈칸이면 그 나라 전체의 일), category, title, summary, source(주소), checked
@@ -10,11 +11,12 @@ category: rate 금리 / earnings 실적 / shareholder 주주환원·배당·자�
 - 받은 자료(BIS)에서 뽑은 값은 숫자뿐이고, 글은 여기서 만든다.
 """
 import csv
+import json
 import sys
 from pathlib import Path
 
 from assets import ASSETS
-from common import HIKE_IX, rate_changes, rate_data
+from common import D, HIKE_IX, rate_changes, rate_data
 
 HERE = Path(__file__).parent
 EV = HERE / "events" / "events.csv"
@@ -22,6 +24,15 @@ COLS = ["date", "country", "asset", "category", "title", "summary", "source", "c
 CATS = ("rate", "earnings", "shareholder", "business", "policy", "incident", "people", "other")
 EV_FROM = "1997-01-01"  # 탐색기의 첫해. 그 앞의 금리 변경은 탭 1 에 날짜가 없어 보일 자리가 없다
 BANK = {"US": "미국 연준", "KR": "한국은행"}
+# 8-K 항목 번호 -> (분류, 이름). 앞에 있는 것이 우선이다(한 공시에 항목이 여럿). 여기 없는 항목만 있는 공시(7.01 보도자료, 8.01 기타, 9.01 첨부)는 싣지 않는다 - 너무 잦고 뜻이 없다.
+SEC_ITEMS = [("2.02", "earnings", "실적 발표"), ("5.02", "people", "임원·이사 변경"), ("1.01", "business", "중요 계약 체결"),
+             ("2.01", "business", "자산 취득·처분 완료"), ("1.02", "business", "중요 계약 종료"), ("2.05", "business", "구조조정 비용"),
+             ("2.06", "business", "자산 손상"), ("4.02", "incident", "재무제표 신뢰 불가"), ("4.01", "incident", "감사인 변경"),
+             ("5.01", "people", "지배권 변경"), ("5.07", "shareholder", "주주총회 결과"), ("3.03", "shareholder", "주주 권리 변경")]
+SEC_NAMES = {"1.01": "중요 계약 체결", "1.02": "계약 종료", "2.01": "자산 취득·처분 완료", "2.02": "실적 발표", "2.03": "채무 발생", "2.04": "채무 조기 상환 사유",
+             "2.05": "구조조정 비용", "2.06": "자산 손상", "3.01": "상장 관련 통지", "3.02": "비등록 증권 발행", "3.03": "주주 권리 변경", "4.01": "감사인 변경",
+             "4.02": "재무제표 신뢰 불가", "5.01": "지배권 변경", "5.02": "임원·이사 변경", "5.03": "정관 변경", "5.05": "윤리 규정 변경", "5.07": "주주총회 결과",
+             "5.08": "주주 추천", "7.01": "보도자료(Reg FD)", "8.01": "기타", "9.01": "첨부"}
 
 
 def fmt(v):
@@ -38,6 +49,34 @@ def auto_rows(rates):
                          "title": f"{BANK[c]} 정책금리 {'인상' if dv > 0 else '인하'} {dv:+.2f}%p -> {fmt(v)}",
                          "summary": f"{fmt(v - dv)} -> {fmt(v)}. BIS 일별 정책금리 자료에서 값이 바뀐 날", "source": "BIS", "checked": "auto"})
     return sorted(rows, key=lambda r: (r["date"], r["country"]))
+
+
+def load_sec():
+    """fetch.py sec 가 받은 8-K 목록. 아직 안 받았으면 빈 것(그러면 자동 줄은 금리 변경일뿐이다)."""
+    p = D / "sec_8k.json"
+    return json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+
+
+def sec_rows(sec):
+    """8-K 공시 한 줄씩. 분류는 SEC_ITEMS 의 첫 번째로 맞는 항목이 정하고, 제목에는 항목 이름을 다 적는다."""
+    rows = []
+    for key, filings in sec.items():
+        a = ASSETS[key]
+        for f in filings:
+            items = [x.strip() for x in f["items"].split(",") if x.strip()]
+            hit = next(((cat, nm) for code, cat, nm in SEC_ITEMS if code in items), None)
+            if not hit:
+                continue
+            names = " · ".join(SEC_NAMES.get(x, x) for x in items if x != "9.01")
+            rows.append({"date": f["date"], "country": "US", "asset": key, "category": hit[0],
+                         "title": f"{a['name']} 공시(8-K): {names}",
+                         "summary": f"보고 기준일 {f['report'] or '-'}. 항목 {', '.join(items)}. SEC EDGAR 에 제출된 수시 공시이고 글은 출처에서 본다",
+                         "source": f"https://www.sec.gov/Archives/edgar/data/{a['cik']}/{f['acc'].replace('-', '')}/{f['doc']}", "checked": "auto"})
+    return rows
+
+
+def auto_rows_all(rates, sec):
+    return sorted(auto_rows(rates) + sec_rows(sec), key=lambda r: (r["date"], r["country"], r["asset"]))
 
 
 def load_events():
@@ -103,9 +142,13 @@ def main():
         print(f"{sys.argv[2]}: {len(new)}줄 중 {added}줄 더함, {len(bad)}줄 받지 않음, 나머지는 이미 있던 줄 -> 전체 {len(rows)}줄")
         return
     manual = [r for r in load_events() if r["checked"] != "auto"]
-    auto = auto_rows(rate_data())
-    write_events(sorted(manual + auto, key=lambda r: (r["date"], r["country"])))
-    print(f"{EV}: 자동 {len(auto)}줄(금리 변경일 {EV_FROM} 부터) + 손으로 적은 {len(manual)}줄")
+    auto = auto_rows_all(rate_data(), load_sec())
+    # 조사해 온 실적 발표 줄은 공시가 같은 날 있으면 공시 쪽만 남긴다. 조사 줄은 기억에서 나온 날짜가 많고 공시는 확인된 날짜다
+    known = {(r["asset"], r["date"]) for r in auto if r["category"] == "earnings"}
+    kept = [r for r in manual if not (r["category"] == "earnings" and (r["asset"], r["date"]) in known)]
+    write_events(sorted(kept + auto, key=lambda r: (r["date"], r["country"], r["asset"])))
+    print(f"{EV}: 자동 {len(auto)}줄(금리 변경일 {EV_FROM} 부터 + 8-K 공시) + 조사해 온 {len(kept)}줄"
+          + (f" (실적 발표 {len(manual) - len(kept)}줄은 같은 날 공시가 있어 뺐다)" if len(kept) < len(manual) else ""))
 
 
 if __name__ == "__main__":
