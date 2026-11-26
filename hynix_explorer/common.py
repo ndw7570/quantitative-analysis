@@ -35,6 +35,30 @@ def us(name):
     return pd.read_csv(D / f"yf_{name}.csv", index_col=0, parse_dates=True)["Close"].dropna()
 
 
+YEAR_DAYS = ["전년 말"] + [d.strftime("%m-%d") for d in pd.date_range("2025-01-01", "2025-12-31")]  # 평년 365일 + 기준 칸
+
+
+def year_paths(close):
+    """해마다 "전년 마지막 종가 = 0%"로 다시 잰 누적 수익률(%)을 달력 날짜 칸에 놓는다(탭 3 "두 해 겹쳐 보기").
+
+    칸은 YEAR_DAYS 366개로 모든 해가 같다. 거래일 번호로 맞추지 않는 이유: 해마다 휴장일이 달라 같은 번호가
+    다른 날짜가 되고, 선거일처럼 날짜로 정해진 사건을 두 해에 한 줄로 그을 수 없다.
+    - 장이 쉰 날은 직전 종가를 잇는다(1월 1일은 늘 0%).
+    - 2월 29일은 뺀다. 그날 종가는 다음 휴장일로 이어질 뿐 사라지지 않는다.
+    - 마지막 해는 받은 날까지만 채우고 그 뒤는 비운다. 첫 해는 전년 말 종가가 없어 뺀다.
+    """
+    last = close.index[-1]
+    years = {}
+    for y in sorted(set(close.index.year))[1:]:
+        cur = close[close.index.year == y]
+        pct = (cur / close[close.index.year == y - 1].iloc[-1] - 1) * 100
+        s = pct.reindex(pd.date_range(f"{y}-01-01", last if y == last.year else f"{y}-12-31")).ffill().fillna(0.0)
+        s = s[~((s.index.month == 2) & (s.index.day == 29))]
+        vals = [0.0] + [round(float(v), 2) for v in s]
+        years[str(y)] = vals + [None] * (len(YEAR_DAYS) - len(vals))
+    return {"end": last.strftime("%Y-%m-%d"), "days": YEAR_DAYS, "years": years}
+
+
 def on_calendar(px, cal):
     """미국 일별 자료를 한국 달력(cal)에 얹는다. 날짜는 미국 날짜 그대로다(하루 늦추지 않는다).
 

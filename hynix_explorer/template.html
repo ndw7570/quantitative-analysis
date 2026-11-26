@@ -99,6 +99,7 @@ td small,th small{color:var(--muted);font-weight:400}
 <div class="tabs" role="tablist">
   <button role="tab" data-tab="explore">기간 비교</button>
   <button role="tab" data-tab="sig">극단값 신호표</button>
+  <button role="tab" data-tab="year">두 해 겹쳐 보기</button>
 </div>
 
 <div id="tab_explore">
@@ -187,6 +188,29 @@ td small,th small{color:var(--muted);font-weight:400}
   </ul>
 </div>
 </div>
+
+<div id="tab_year" hidden>
+<div class="card">
+  <h2>S&amp;P500 두 해 겹쳐 보기 - 연초부터의 수익률</h2>
+  <p class="sub">방송 화면의 차트("트럼프 1기 vs 2기 중간선거", 2018년과 2026년)와 같은 구성입니다. 두 해를 "전년 마지막 종가 = 0%"로 맞춰 같은 달력 날짜에 포갭니다. 묻는 것은 하나입니다: <b>올해가 그 해와 얼마나 같은 길을 왔고, 그 해는 이 날짜 뒤에 어떻게 됐는가.</b></p>
+  <div class="ctrl">
+    <label>비교할 해 <select id="y_b" style="font-weight:650"></select></label>
+  </div>
+  <div class="ctitle" id="y_title"></div>
+  <div id="y_chart"></div>
+  <div class="tw" style="margin-top:10px"><table id="y_table"></table></div>
+</div>
+<div class="card">
+  <h2>읽는 법과 한계</h2>
+  <ul>
+    <li><b>닮은 해 하나는 표본 1개입니다.</b> 비교할 해를 바꿔 가며 보세요. 어느 해와 포개도 비슷한 구간은 나옵니다. 1951년 이후 74개 해를 올해와의 평균 거리로 줄 세우면 2018년은 16번째였습니다(2026-11-25 기준, 이 화면 밖에서 따로 계산한 값이라 날이 지나면 달라집니다).</li>
+    <li><b>세로선</b>은 미국 중간선거일(11월 첫 월요일 다음 날)입니다. 중간선거가 있는 해(4년마다)를 골랐을 때만 긋습니다. 선거 결과와 정책은 이 자료에 없습니다 - 날짜만 표시합니다.</li>
+    <li><b>날짜 맞춤</b>: 달력 날짜로 맞춥니다. 장이 쉰 날은 직전 종가를 이어 그리고, 2월 29일은 칸이 없습니다. 그래서 표의 "저점·고점 날짜"는 그 값이 처음 나온 날입니다.</li>
+    <li><b>자료</b>: 야후 파이낸스의 S&amp;P500 종가(미국 달력 그대로, 배당 제외), 1995년부터. 탭 1·2 의 값과 달리 한국 달력에 얹지 않았습니다.</li>
+    <li>"그 뒤 연말까지"는 표의 기준 날짜 종가에서 그 해 마지막 종가까지의 수익률입니다. 올해는 아직 값이 없습니다.</li>
+  </ul>
+</div>
+</div>
 </main>
 
 <div class="ov" id="ov"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="m_title">
@@ -197,6 +221,7 @@ td small,th small{color:var(--muted);font-weight:400}
 
 <script>
 const ALL = __DATA__, KEYS = Object.keys(ALL);   // {대상: {R: 탭 1 자료, G: 탭 2 자료}}
+const SPX = __SPX__;   // 탭 3 자료: {end: 마지막 날, days: 달력 칸 366개, years: {해: 칸마다 연초부터의 수익률 %}} (common.py 의 year_paths)
 // 날짜 목록은 모든 대상이 같다(build.py 가 확인한다). 날짜만 볼 때는 이 S 를 쓰고, 값은 각 창이 고른 대상에서 읽는다.
 const R = ALL[KEYS[0]].R, S = R.series, N = S.date.length;
 document.getElementById('m_range').textContent = `${S.date[0]} ~ ${S.date[N - 1]} (${N.toLocaleString('ko-KR')}거래일)`;
@@ -251,7 +276,8 @@ function niceTicks(lo, hi, n) {
 
 /* 한 창의 한 차트. 모든 배열은 창 기준(0..n-1)으로 잘라서 받는다.
    cfg: {dates, lines:[{name,short,color,vals:[arr,..],fmt,w,noEnd}], points:{vals,flags,name,flagName},
-         strips:[{name,vals,map}], vlines:[{i,label}], bands:[{a,b,label}], extraTip, fmt, zero, log, h, onBrush} */
+         strips:[{name,vals,map}], vlines:[{i,label,left}], bands:[{a,b,label}], extraTip, fmt, zero, log, h, onBrush,
+         xticks:[{i,label}] - 주면 가로축 눈금을 날짜에서 뽑지 않고 이것을 쓴다(탭 3 은 dates 가 연-월-일이 아니다)} */
 function chart(host, cfg) {
   host.innerHTML = ''; host.className = 'chart';
   const lines = cfg.lines || [], strips = cfg.strips || [], n = cfg.dates.length;
@@ -290,7 +316,12 @@ function chart(host, cfg) {
   el('line', {x1: m.l, x2: W - m.r, y1: m.t + ph, y2: m.t + ph, stroke: 'var(--axis)'}, svg);
   // 가로축: 짧은 기간은 월, 긴 기간은 연. 라벨이 겹치지 않게 최소 간격을 둔다
   const byMonth = n <= 330; let lastX = -99;
-  cfg.dates.forEach((d, i) => {
+  if (cfg.xticks) cfg.xticks.forEach(t => {
+    el('line', {x1: x(t.i), x2: x(t.i), y1: yb, y2: yb + 4, stroke: 'var(--axis)'}, svg);
+    if (x(t.i) - lastX < 34) return; lastX = x(t.i);
+    el('text', {x: x(t.i), y: yb + 16, 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--muted)'}, svg, t.label);
+  });
+  else cfg.dates.forEach((d, i) => {
     if (!i) return; const p = cfg.dates[i - 1];
     const newY = d.slice(0, 4) !== p.slice(0, 4), newM = d.slice(0, 7) !== p.slice(0, 7);
     if (!(byMonth ? newM : newY)) return;
@@ -308,7 +339,8 @@ function chart(host, cfg) {
   vl.forEach((v, k) => {
     const ly = m.t - 12 + (k % 2) * 11;
     el('line', {x1: x(v.i), x2: x(v.i), y1: vl.length <= 6 ? ly - 7 : m.t, y2: m.t + ph, stroke: 'var(--ink2)', 'stroke-width': 1, 'stroke-opacity': .7}, svg);
-    if (vl.length <= 6) el('text', {x: x(v.i) + 3, y: ly, 'font-size': 10.5, fill: 'var(--ink2)'}, svg, v.label);
+    // left: 이름표를 선 왼쪽에 단다. 며칠 차이로 붙은 두 선(탭 3 의 두 선거일)은 줄을 바꿔도 글자가 겹친다.
+    if (vl.length <= 6) el('text', {x: x(v.i) + (v.left ? -3 : 3), y: ly, 'text-anchor': v.left ? 'end' : 'start', 'font-size': 10.5, fill: 'var(--ink2)'}, svg, v.label);
   });
   const half = n > 1 ? pw / (n - 1) / 2 : pw / 2;
   strips.forEach((st, r) => {
@@ -702,21 +734,53 @@ gui('g_last').onclick = () => { gT = GN - 1; sigRender(); };
 gui('g_peak').onclick = () => { gT = G.close.indexOf(Math.max(...G.close)); sigRender(); };
 gui('g_q').onchange = gui('g_basis').onchange = sigRender;
 
+// ---------- 탭 3: 두 해 겹쳐 보기 (S&P500) ----------
+// 검은 선은 늘 자료의 마지막 해다. 묻는 것이 "올해가 어느 해와 닮았나"라서 한쪽은 고르지 않는다.
+const YA = SPX.end.slice(0, 4);
+// 중간선거일은 11월 첫 월요일 다음 날로 정해져 있어 자료 없이 계산한다. 4로 나눠 2가 남는 해에 있다.
+const voteDay = y => y % 4 === 2 ? '11-' + String(2 + (8 - new Date(+y, 10, 1).getDay()) % 7).padStart(2, '0') : null;
+function yearRender() {
+  const yb = gui('y_b').value, a = SPX.years[YA], b = SPX.years[yb], D = SPX.days;
+  const T = a.indexOf(null) < 0 ? D.length - 1 : a.indexOf(null) - 1;  // 올해 값이 있는 마지막 칸
+  gui('y_title').textContent = `S&P500 연초부터의 수익률 (%, 전년 마지막 종가 = 0) - 검은 선 ${YA}년은 ${SPX.end} 까지`;
+  chart(gui('y_chart'), {dates: D, h: 320, fmt: pc, zero: true,
+    xticks: D.flatMap((d, i) => d.endsWith('-01') ? [{i, label: +d.slice(0, 2) + '월'}] : []),
+    vlines: [YA, yb].flatMap(y => voteDay(y) ? [{i: D.indexOf(voteDay(y)), label: `${y} 중간선거일`, left: y === YA}] : []),
+    lines: [{name: `${YA}년`, vals: [a], color: '--ink', fmt: pc, w: 2.2, noEnd: true},  // 중간에서 끝나는 선이라 오른쪽 끝 이름표를 달지 않는다
+            {name: `${yb}년`, vals: [b], color: '--s1', fmt: pc, w: 1.6}]});
+  const row = (y, v, done) => { let lo = 1, hi = 1;
+    for (let i = 1; i <= T; i++) { if (v[i] < v[lo]) lo = i; if (v[i] > v[hi]) hi = i; }
+    const end = v[D.length - 1], rest = ((1 + end / 100) / (1 + v[T] / 100) - 1) * 100;
+    return `<tr><td>${y}년</td><td>${pc(v[T])}</td><td>${pc(v[lo])} <small>${D[lo]}</small></td><td>${pc(v[hi])} <small>${D[hi]}</small></td>` +
+      `<td>${done ? pc(rest) : '-'}</td><td>${done ? pc(end) : '-'}</td></tr>`; };
+  gui('y_table').innerHTML = `<tr><th>해</th><th>${D[T]} 까지</th><th>그날까지 저점</th><th>그날까지 고점</th><th>그 뒤 연말까지</th><th>한 해 전체</th></tr>`
+    + row(YA, a, false) + row(yb, b, true);
+}
+gui('y_b').innerHTML = Object.keys(SPX.years).filter(y => y !== YA).reverse()
+  .map(y => `<option value="${y}">${y}년${voteDay(y) ? ' (중간선거)' : ''}</option>`).join('');
+if (SPX.years[2018]) gui('y_b').value = '2018';  // 방송 화면이 견준 해
+gui('y_b').onchange = yearRender;
+// 숨겨진 채로 한 번 그린다. 보일 때 다시 그리지만, 여기서 그려 둬야 화면 검사(check.py)가 이 탭의 오류를 잡는다.
+yearRender();
+
 const tabBtns = document.querySelectorAll('.tabs button');
 function setTab(t) {
   tabBtns.forEach(b => { const on = b.dataset.tab === t; b.classList.toggle('on', on); b.setAttribute('aria-selected', on);
     gui('tab_' + b.dataset.tab).hidden = !on; });
   splitBtn.hidden = t !== 'explore';
   // 숨겨진 동안에는 폭이 0이라 차트를 못 그린다. 보이게 된 쪽을 그때 다시 그린다.
-  if (t === 'sig') sigRender(); else window.dispatchEvent(new Event('resize'));
+  if (t === 'sig') sigRender(); else if (t === 'year') yearRender(); else window.dispatchEvent(new Event('resize'));
 }
 tabBtns.forEach(b => b.onclick = () => setTab(b.dataset.tab));
-window.addEventListener('resize', () => { if (!gui('tab_sig').hidden) sigRender(); });
+window.addEventListener('resize', () => { if (!gui('tab_sig').hidden) sigRender(); if (!gui('tab_year').hidden) yearRender(); });
 tabBtns[0].classList.add('on');
 { // 점검·공유용: #sig, #sig-2026-06-22, #sig-2026-06-22-f12, #sig-2026-06-22-f12-kospi 처럼 탭·기준일·지표·대상을 주소로 연다
   const mm = location.hash.match(/^#sig(?:-(\d{4}-\d{2}-\d{2}))?(?:-([a-z0-9]+))?(?:-([a-z]+))?/);
   if (mm) { if (mm[1]) gT = gFind(mm[1]); if (mm[2] && G.ind[mm[2]]) gPick = mm[2];
     setTab('sig'); if (mm[3] && ALL[mm[3]]) setSigAsset(mm[3]); }
+  // #year, #year-2022: 탭 3 과 비교할 해
+  const ym = location.hash.match(/^#year(?:-(\d{4}))?/);
+  if (ym) { if (ym[1] && SPX.years[ym[1]] && ym[1] !== YA) gui('y_b').value = ym[1]; setTab('year'); }
   // #assets-samsung-kospi: 탭 1의 왼쪽·오른쪽 창 대상을 주소로 정한다
   const am = location.hash.match(/assets-([a-z]+)-([a-z]+)/);
   if (am && ALL[am[1]] && ALL[am[2]]) { panes.L.setAsset(am[1]); panes.R.setAsset(am[2]); }

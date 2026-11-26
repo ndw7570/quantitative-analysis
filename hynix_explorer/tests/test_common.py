@@ -86,6 +86,37 @@ class OnCalendar(unittest.TestCase):
         self.assertAlmostEqual(self.out.loc["2026-01-08", "chg"], (15 / 11 - 1) * 100)
 
 
+class YearPaths(unittest.TestCase):
+    def setUp(self):
+        # 2023 은 기준(전년 말)만 주는 해, 2024 는 윤년이면서 끝난 해, 2025 는 받는 중인 마지막 해
+        s = pd.Series({"2023-12-29": 100.0, "2024-02-28": 110.0, "2024-02-29": 120.0, "2024-03-04": 130.0, "2024-12-30": 150.0,
+                       "2025-01-02": 165.0, "2025-01-03": 135.0})
+        s.index = pd.to_datetime(s.index)
+        self.out = common.year_paths(s)
+        self.at = lambda y, md: self.out["years"][y][self.out["days"].index(md)]
+
+    def test_every_year_has_the_same_366_slots(self):
+        self.assertEqual(list(self.out["years"]), ["2024", "2025"])  # 첫 해는 전년 말 종가가 없다
+        self.assertEqual([len(v) for v in self.out["years"].values()], [366, 366])
+        self.assertNotIn("02-29", self.out["days"])
+        self.assertEqual(self.out["end"], "2025-01-03")
+
+    def test_return_is_measured_from_the_previous_year_end(self):
+        self.assertEqual([self.at("2024", d) for d in ("전년 말", "01-01", "02-28", "12-30")], [0, 0, 10, 50])
+        self.assertEqual(self.at("2025", "01-02"), 10)  # 150 -> 165
+        self.assertEqual(self.at("2025", "01-03"), -10)
+
+    def test_closed_days_carry_the_last_close(self):
+        self.assertEqual(self.at("2024", "02-27"), 0)    # 첫 거래 전
+        self.assertEqual(self.at("2024", "03-01"), 20)   # 2월 29일 종가(120)는 칸이 없어도 다음 휴장일로 이어진다
+        self.assertEqual(self.at("2024", "03-04"), 30)
+        self.assertEqual(self.at("2024", "12-31"), 50)   # 끝난 해는 12월 31일까지 채운다
+
+    def test_last_year_is_empty_after_the_last_day(self):
+        self.assertIsNone(self.at("2025", "01-04"))
+        self.assertIsNone(self.at("2025", "12-31"))
+
+
 class Flows(Base):
     def test_stock_shares_are_rescaled_by_the_split_ratio(self):
         # 2026-01-07 에 50:1 분할. 수급 쪽 종가·주식 수는 분할 전 값 그대로, 가격 쪽은 수정주가다.

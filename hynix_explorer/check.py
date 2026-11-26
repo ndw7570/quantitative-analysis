@@ -16,7 +16,7 @@ from pathlib import Path
 import pandas as pd
 
 from assets import ASSETS
-from common import D, prices
+from common import D, prices, us, year_paths
 
 FLOW_FROM = pd.Timestamp("2005-01-03")  # 네이버 증권의 투자자별 수급이 시작되는 날
 SHOW_FROM = "1997-01-01"
@@ -25,7 +25,9 @@ BIG_MOVE = {("kr", "stock"): 30.5, ("kr", "index"): 15, ("us", "stock"): 60, ("u
 BROWSERS = [r"C:\Program Files\Google\Chrome\Application\chrome.exe",
             r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
             r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"]
-MIN_CHARTS = 15  # 처음 열었을 때 그려지는 차트 수(2026-11-25 에 센 값). 화면 구성을 바꾸면 같이 고친다
+# 처음 열었을 때 그려지는 차트 수. 화면 구성을 바꾸면 같이 고친다.
+# 탭 1 이 15개(2026-11-25 에 센 값), 탭 3 이 1개(숨겨진 채로도 한 번 그린다 - template.html 의 yearRender).
+MIN_CHARTS = 16
 errors = []
 
 
@@ -156,6 +158,9 @@ def check_html(path):
     for k in ASSETS:
         if ALL[k]["R"] != load(f"result_{k}.json") or ALL[k]["G"] != load(f"signals_{k}.json"):
             err(f"{k}: HTML 에 든 값이 data/ 의 결과와 다르다")
+    mark3 = "const SPX = "
+    if mark3 not in html or json.JSONDecoder().raw_decode(html, html.index(mark3) + len(mark3))[0] != year_paths(us("spx")):
+        err("HTML 에 든 S&P500 연도별 값(탭 3)이 data/yf_spx.csv 로 다시 계산한 값과 다르다")
     if not errors:
         print("HTML 에 든 값이 data/ 와 같다:", len(ALL), "대상,", ALL["kospi"]["R"]["series"]["date"][-1], "까지")
 
