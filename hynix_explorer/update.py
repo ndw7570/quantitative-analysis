@@ -143,6 +143,7 @@ def main():
     if "--no-fetch" not in args:
         step("fetch", *[a for a in ("--full", "--today") if a in args])
     px_end = freshness()
+    step("events")  # 금리 변경일을 events/events.csv 에 다시 쓴다(손으로 적은 줄은 그대로). check 가 이 파일이 자료와 맞는지 본다
     step("analyze")
     step("signals")
     step("check")

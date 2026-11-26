@@ -122,6 +122,7 @@ td small,th small{color:var(--muted);font-weight:400}
     <li><b>기간 비교</b>: 왼쪽·오른쪽 창에서 각각 대상(한국 9개, 미국 6개)과 연도·월을 고릅니다. 예) 왼쪽 2025년 1월, 오른쪽 2026년 1월. 같은 기간에 대상만 다르게 놓아도 됩니다. 날짜를 직접 넣어도 됩니다. 창 머리는 스크롤해도 위에 붙어 있습니다.</li>
     <li><b>대상마다 시작하는 해가 다릅니다</b>: <span class="m_starts"></span>. 그보다 앞의 기간을 고르면 창에 안내가 나옵니다. 투자자별 수급은 어느 대상이든 2005년부터입니다.</li>
     <li><b>구간 분석</b>: 아무 차트 위에서 마우스를 눌러 끌면 구간이 선택됩니다. "선택 구간 분석"을 누르면 그 기간의 모델 값이 팝업으로 나옵니다. 양쪽 창에 모두 구간을 잡으면 팝업에 나란히 나옵니다.</li>
+    <li><b>경제 이슈</b>: 첫 차트(종가)의 가로축 바로 위에 작은 점이 있는 날은 그날 이슈가 있는 날입니다(지금은 미국 연준·한국은행의 정책금리 변경일, 1997년부터). 마우스를 올리면 내용이 나옵니다. 장이 쉰 날의 이슈는 다음 거래일에 붙습니다. 목록은 <code>events/events.csv</code> 이고 손으로 더 적을 수 있습니다.</li>
     <li>차트의 세로축은 창마다 따로 맞춥니다. 두 창의 선 높이를 직접 비교하지 말고 축의 숫자를 읽어야 합니다.</li>
   </ul>
   <div class="ctitle"><span id="ov_name"></span> 전체 기간 종가 (로그 눈금, 왼쪽 창의 대상) - 음영이 각 창이 보고 있는 기간</div>
@@ -246,12 +247,19 @@ td small,th small{color:var(--muted);font-weight:400}
     <label id="r_spanw">기간 <select id="r_span"></select></label>
     <label id="r_fromw" hidden>시작 해 <select id="r_from"></select></label>
     <label>세로축 <select id="r_cap"></select></label>
+    <label><input type="checkbox" id="r_hike"> 인상기 분석</label>
     <button id="r_main">주요 6개</button><button id="r_all">전체 겹치기</button><button id="r_none">모두 빼기</button>
     <label id="r_cnt"></label>
   </div>
   <div class="chips" id="r_chips"></div>
   <p class="hint">목록에서 나라를 고르면 꼬리표가 붙고 차트에 겹칩니다. 꼬리표를 누르면 빠집니다. 개수 제한은 없습니다. 같은 색이 같은 나라이고 <b>실선은 정책금리, 점선은 소비자물가 상승률</b>입니다. "보기"에서 금리와 물가를 차트 둘로 나누거나, 금리를 해마다 겹쳐(가로축 1월 ~ 12월, 시작 해부터 올해까지) 볼 수 있습니다 - 해마다 겹칠 때는 선의 색이 나라가 아니라 해입니다. <b>차트 위를 시작점에서 끝점까지 끌면 그 구간을 확대한 팝업이 열립니다.</b></p>
   <div id="r_charts"></div>
+  <div id="r_hwrap" hidden>
+    <div class="ctitle">인상기 분석 - 지금이 과거 인상기의 어느 자리인가 (예측이 아닙니다)</div>
+    <p class="hint" id="r_hnote"></p>
+    <div class="tw"><table id="r_board"></table></div>
+    <div id="r_cycles"></div>
+  </div>
   <div id="r_ywrap" hidden><div class="ctitle">해마다 - 그 해 마지막 날의 금리와 한 해 동안의 변화 (전년 마지막 날보다)</div><div class="tw"><table id="r_ytable"></table></div></div>
   <div class="tw" style="margin-top:10px"><table id="r_table"></table></div>
 </div>
@@ -274,6 +282,7 @@ td small,th small{color:var(--muted);font-weight:400}
     <li><b>물가 자료가 고르지 않은 곳</b>: 호주·뉴질랜드는 분기에 한 번 나온 값이 석 달 동안 같은 값으로 들어 있습니다(BIS 파일 그대로). 스웨덴은 1955-05 까지, 홍콩은 1951-11 까지 석 달에 한 값만 있습니다. 미국 2025-10 은 값이 없습니다. 빈 달은 앞뒤를 곧게 이었고 마우스를 올리면 "-"로 나옵니다.</li>
     <li><b>중앙은행이 보는 물가와 같지 않을 수 있습니다.</b> 여기 물가는 나라마다 대표 소비자물가지수 하나입니다. 미국 연준이 목표(2%)로 삼는 것은 개인소비지출(PCE) 물가인데, 로그인 없이 받을 길을 아직 찾지 못해 싣지 않았습니다. 식료품·에너지를 뺀 근원 물가도 여기 없습니다.</li>
     <li><b>확대 팝업</b>: 차트 위에서 마우스를 누른 채 끌었다 놓으면 그 기간만 크게 다시 그립니다. 세로축도 그 기간의 값에 맞춰 다시 잡습니다(0 이 빠질 수 있습니다). 물가는 달마다 한 값이라 한 달보다 짧게 끌면 점선은 앞뒤 달의 점을 이은 선의 한 토막이고, "따로" 보기의 물가 차트는 앞 달까지 두 달을 그립니다. 팝업 안에서 다시 끌면 더 좁혀지고, 팝업 위의 "← 이전 확대"로 한 단계 앞의 구간으로 돌아가며 "다음 확대 →"로 다시 갑니다(돌아간 자리에서 새로 끌면 그 뒤 단계는 지워집니다). Esc 나 바깥을 누르면 닫힙니다. 아래 표는 팝업이 아니라 위 "기간"(해마다 겹쳐 볼 때는 "시작 해"부터)의 값입니다.</li>
+    <li><b>인상기 분석</b>(체크박스): 미국·한국에 대해 신호 4개와 과거 인상기 표가 나옵니다. <b>예측이 아니라 "지금이 과거 인상기의 어느 자리인가"입니다.</b> 인상기는 사이에 인하 없이 연속으로 3회 이상 올린 것으로 셌고(1990년 이후. 미국은 1985년까지 시장 금리라 그 앞은 횟수를 셀 수 없습니다), 정점은 그 마지막 인상일입니다 - 정점은 지나고 나서야 알 수 있습니다. 차트에는 첫 인상 ~ 정점을 띠로, 정점에 세로선을 긋습니다. 표의 수익률은 정점 뒤 그 나라 지수(S&amp;P500, 코스피)의 3·6·12개월 뒤 값입니다. 받아 둔 자료로 본 것: 미국은 인상기 5번 중 3번이 정점 뒤 3개월 안에 올랐고, 늦었던 두 번(2000년, 2023년)은 인상 횟수가 아니라 경기침체(2000년)와 정점 뒤 장기금리 상승(2023년)이 겹친 때였습니다(이 해석은 자료 밖입니다). "인상기가 끝나면 자금이 도는 데 1년"이라는 통념은 이 표본에서는 보이지 않습니다. 유로존은 유가 때문에 올렸다가 서너 달 만에 되돌린 적이 두 번 있습니다(2008-07, 2011-04·07). 표본이 미국 5번·한국 3번뿐이라 규칙으로 쓸 수 없고, 켜진 신호의 개수는 판정이 아닙니다. 매수·매도 권유가 아닙니다.</li>
     <li>표의 <b>%p</b>(퍼센트포인트)는 금리끼리의 차이입니다. 3.00%가 3.50%가 되면 +0.50%p 입니다. "1년 전보다"는 그 나라 자료의 마지막 날에서 365일 전 값과 견준 것입니다.</li>
     <li><b>자료</b>: 국제결제은행(BIS)의 중앙은행 정책금리(하루 단위)와 소비자물가(달 단위, 전년 같은 달 대비 %). 정책금리는 BIS 에 일별 자료가 있는 49줄 가운데 26개 나라를 골랐고(유로화를 쓰기 전의 나라별 자료, 2025-07 에서 멈춘 아르헨티나 등은 뺐습니다), 물가는 같은 26개 나라입니다. 물가는 파일에 1914년 것부터 있는 나라도 있지만 화면에는 정책금리 자료가 시작하는 1946년부터 실었습니다.</li>
   </ul>
@@ -297,6 +306,11 @@ td small,th small{color:var(--muted);font-weight:400}
 <script>
 const ALL = __DATA__, KEYS = Object.keys(ALL);   // {대상: {R: 탭 1 자료, G: 탭 2 자료}}
 const RATES = __RATES__;   // 탭 4 자료: {start, end, areas: {나라 부호: {name, group, note, last: 자료 마지막 날, steps: [[바뀐 날, 값 %]], cpi: {from: 첫 달, v: [달마다 물가 상승률 %]}}}} (common.py 의 rate_data)
+const HIKE = __HIKE__;   // 탭 4 인상기 분석: {min, from, after, drop, window, areas: {US|KR: {name, ix, ix_end, cycles: [...], board: {s1..s4, count}}}} (common.py 의 hike_data)
+const EVENTS = __EVENTS__;   // 날짜별 경제 이슈 [{date, country, category, title, summary, source, checked}] (events/events.csv)
+// 탭 1 툴팁의 이슈: 이슈의 날짜를 화면 달력(모든 대상이 같은 날짜 목록)의 칸 번호로 옮긴다. 장이 쉰 날의 이슈는 다음 거래일 칸에 붙는다.
+const EV_AT = {}; { const dts = ALL[KEYS[0]].R.series.date; let j = 0;
+  [...EVENTS].sort((p, q) => p.date < q.date ? -1 : p.date > q.date ? 1 : 0).forEach(e => { while (j < dts.length && dts[j] < e.date) j++; if (j < dts.length) (EV_AT[j] ||= []).push(e); }); }
 const YIX = __YIX__;   // 탭 3 자료: {days: 달력 칸 366개, idx: {지수: {name, market, end: 마지막 날, years: {해: 칸마다 연초부터의 수익률 %}}}} (common.py 의 year_data)
 // 날짜 목록은 모든 대상이 같다(build.py 가 확인한다). 날짜만 볼 때는 이 S 를 쓰고, 값은 각 창이 고른 대상에서 읽는다.
 const R = ALL[KEYS[0]].R, S = R.series, N = S.date.length;
@@ -365,6 +379,7 @@ function chart(host, cfg) {
   if (lines.length > 1 || cfg.points || strips.length) lines.forEach(l => { if (!l.quiet && l.lg !== false) addLg('', l.color, l.lg || l.name, l.dash); });
   (cfg.extraLegend || []).forEach(e => addLg('', e.color, e.name, e.dash));
   if (cfg.points) { addLg('dot', '--muted', cfg.points.name); addLg('dot', '--crit', cfg.points.flagName); }
+  if (cfg.events && cfg.events.some(Boolean)) addLg('dot', '--ink2', '경제 이슈 (마우스를 올리면 내용)');
   strips.forEach(st => Object.values(st.map).forEach(([nm, c]) => addLg('box', c, st.name + ': ' + nm)));
   if (lg.children.length) host.appendChild(lg);
 
@@ -442,6 +457,8 @@ function chart(host, cfg) {
     p.vals.forEach((v, i) => { if (v == null) return; const f = p.flags[i];
       el('circle', {cx: x(i), cy: y(v), r: f ? r0 + 1.2 : r0, fill: `var(${f ? '--crit' : '--muted'})`}, svg); });
   }
+  // events: 날짜별 이슈(탭 1). 가로축 바로 위에 작은 점만 찍는다 - 날이 수십 개라 글자를 달면 겹친다. 내용은 툴팁에.
+  if (cfg.events) cfg.events.forEach((ev, i) => { if (ev) el('circle', {cx: x(i), cy: m.t + ph - 4, r: 2.6, fill: 'var(--ink2)', 'fill-opacity': .8}, svg); });
   if (clip) el('rect', {x: m.l, y: m.t, width: pw, height: ph + 1}, el('clipPath', {id: clip}, svg));
   const ends = [];
   // quiet: 배경으로 까는 선(탭 3 의 회색 선). 먼저 그려 밑에 깔고 범례·툴팁·끝 이름표에서 뺀다. 수십 개가 한꺼번에 오기 때문이다.
@@ -494,6 +511,8 @@ function chart(host, cfg) {
       h += `<div><i style="${sw}"></i><span>${l.name}</span> ${l.vals.map(a => fv(l.tv ? l.tv(i) : a[i], l.fmt)).join(' ~ ')}</div>`; });
     strips.forEach(st => { const c = st.map[st.vals[i]]; if (c) h += `<div><i style="background:var(${c[1]})"></i><span>${st.name}</span> ${c[0]}</div>`; });
     (cfg.extraTip || []).forEach(t => { h += `<div>${t.color ? `<i style="background:var(${t.color})"></i>` : ''}<span>${t.name}</span> ${fv(t.vals[i], t.fmt)}</div>`; });
+    // 이슈 글은 events.csv 에서 온 것이라(손으로 적은 줄 포함) 그대로 넣지 않고 esc 를 거친다
+    (cfg.events && cfg.events[i] || []).forEach(e => { h += `<div><i style="background:var(--ink2)"></i><span>${e.country === 'US' ? '미국' : e.country === 'KR' ? '한국' : esc(e.country)}</span> ${esc(e.title)}</div>`; });
     tip.innerHTML = h;
     // 줄이 많으면(탭 4 의 해마다 겹쳐 보기 - 해가 수십 개) 단을 나눈다. 한 줄로 세우면 화면 아래로 넘친다.
     tip.style.columns = tip.children.length > 17 ? Math.ceil((tip.children.length - 1) / 12) : ''; tip.style.display = 'block';
@@ -677,7 +696,7 @@ class Pane {
     // 자료가 없는 차트도 자리는 남긴다. 빼 버리면 두 창의 차트 줄이 어긋나서 나란히 보기 어렵다.
     const gap = (title, why, h) => { const t = document.createElement('div'); t.className = 'ctitle'; t.textContent = title; box.appendChild(t);
       const g = document.createElement('div'); g.className = 'gap'; g.textContent = why; if (h) g.style.minHeight = h + 'px'; box.appendChild(g); };
-    add(`${M.name} 종가·이동평균·변화점${M.unit ? ` (${M.unit}${lg})` : lg && ` (${lg.slice(2)})`}`, {fmt: paxis(M), h: 240, log: long, vlines, strips: [tstrip, {name: '국면', vals: sl('regime'), map: REG}], lines: [
+    add(`${M.name} 종가·이동평균·변화점${M.unit ? ` (${M.unit}${lg})` : lg && ` (${lg.slice(2)})`}`, {fmt: paxis(M), h: 240, log: long, vlines, events: dates.map((_, i) => EV_AT[a + i] || null), strips: [tstrip, {name: '국면', vals: sl('regime'), map: REG}], lines: [
       {name: '종가', vals: [sl('close')], color: '--ink', fmt: pf, w: 1.8},
       {name: '20일선', vals: [sl('ma20')], color: '--s1', fmt: pf, w: 1.4},
       {name: '60일선', vals: [sl('ma60')], color: '--s2', fmt: pf, w: 1.4},
@@ -1074,6 +1093,7 @@ function rateRender() {
   rDraw();
   const mode = gui('r_mode').value, over = mode === 'year', both = mode === 'both';
   gui('r_spanw').hidden = over; gui('r_fromw').hidden = gui('r_ywrap').hidden = !over;
+  const hk = gui('r_hike').checked; gui('r_hwrap').hidden = !hk;
   const picked = RC.filter(c => rPick.has(c)), cap = +gui('r_cap').value;
   // "전체"는 고른 나라의 자료(금리든 물가든)가 시작되는 날부터 그린다. 가장 이른 나라(1946년)에 맞추면 늦게 시작하는 나라만 골랐을 때 앞쪽 수십 년이 빈다.
   const first = c => { const A = RATES.areas[c]; return Math.max(0, Math.min(rIdx(A.steps[0][0]), A.cpi ? rIdx(A.cpi.from + '-01') : RN)); };
@@ -1085,8 +1105,15 @@ function rateRender() {
   if (!picked.length) { gui('r_charts').innerHTML = '<div class="ctitle">정책금리 (%)</div><div class="gap">나라를 고르세요.</div>'; gui('r_table').innerHTML = gui('r_ytable').innerHTML = ''; return; }
   const zsub = '이 안에서 다시 끌면 더 좁혀집니다 · Esc 나 바깥을 누르면 닫힙니다';
   // 하루 칸 a..e 의 차트(한 차트에 금리와 물가, 또는 금리·물가 따로 둘). 화면은 고른 기간, 확대 팝업은 끈 기간으로 부른다.
+  // 인상기 표시: 고른 나라 가운데 인상기 자료가 있는 나라(미국·한국)의 첫 인상 ~ 정점을 띠로, 정점에 세로선. 구간 밖은 자르고 아예 안 겹치면 뺀다.
+  const hikeMarks = (a, e) => { const bands = [], vlines = []; if (!hk) return {};
+    picked.filter(c => HIKE.areas[c]).forEach(c => HIKE.areas[c].cycles.forEach(cy => {
+      const f = rIdx(cy.first), q = rIdx(cy.peak); if (q < a || f > e) return;
+      bands.push({a: Math.max(f, a) - a, b: Math.min(q, e) - a, label: `${HIKE.areas[c].name} 인상 ${cy.n}회`});
+      if (q <= e) vlines.push({i: q - a, label: `${HIKE.areas[c].name} 정점 ${cy.peak.slice(0, 7)}`}); }));
+    return {bands, vlines}; };
   const make = (a, e, zoom) => {
-    const D = RD.slice(a, e + 1), n = D.length;
+    const D = RD.slice(a, e + 1), n = D.length, hm = hikeMarks(a, e);
     // 물가의 달 칸은 금리의 첫날이 든 달부터 마지막 날이 든 달까지다. 한 달 안쪽을 확대하면 점 하나라 선이 안 생기므로 앞 달까지 두 달을 그린다.
     const me = ymi(D[n - 1]) - CM0, ma = Math.max(0, Math.min(ymi(D[0]) - CM0, me - 1)), MD = CM.slice(ma, me + 1);
     // v: 금리(하루 칸), cv: 물가(달 칸 - 따로 그릴 때), cd: 물가(하루 칸에 달마다 한 점 - 한 차트에 그릴 때), cm: 물가 전체(달 칸 - 마우스를 올린 날의 값)
@@ -1123,7 +1150,7 @@ function rateRender() {
       const few = P.length - G.length <= 2;
       return {P, D, sub, items: [{title: `${one}정책금리(실선)와 소비자물가 상승률(점선. 1년 전 같은 달보다) (%) - ${D[0]} ~ ${D[n - 1]}` + cut('v', 'cd'),
         abs: (i, j) => [a + i, a + j],
-        cfg: {...base(D, xticks, '주요국 정책금리와 소비자물가 상승률', zoom ? 460 : 400),
+        cfg: {...base(D, xticks, '주요국 정책금리와 소비자물가 상승률', zoom ? 460 : 400), ...hm,
           extraLegend: [{color: '--ink2', name: '실선: 정책금리'}, {color: '--ink2', name: '점선: 소비자물가 상승률 (달마다 한 값)', dash: true},
             ...(G.length ? [{color: PGRAY, name: `회색 선은 나라 ${G.length}개 (나라마다 값은 아래 표)`}] : [])],
           extraTip: G.length ? [gtip(D, `회색 ${G.length}개 금리`, (p, i) => p.v[i]), gtip(D, `회색 ${G.length}개 물가`, cmv)] : [],
@@ -1138,7 +1165,7 @@ function rateRender() {
       extraTip: G.length ? [gtip(dates, `회색 선 ${G.length}개`, (p, i) => p[key][i])] : [],
       lines: P.map(p => line(p, key, end, dates, {step: key === 'v'}))});
     return {P, D, sub, items: [
-      {title: `${one}정책금리 (%) - ${D[0]} ~ ${D[n - 1]}` + cut('v'), cfg: cfg(D, 'v', 'last', xticks, '주요국 정책금리', zoom ? 380 : 340), abs: (i, j) => [a + i, a + j]},
+      {title: `${one}정책금리 (%) - ${D[0]} ~ ${D[n - 1]}` + cut('v'), cfg: {...cfg(D, 'v', 'last', xticks, '주요국 정책금리', zoom ? 380 : 340), ...hm}, abs: (i, j) => [a + i, a + j]},
       // 물가 차트에서 끈 달은 그 달의 첫날부터 마지막 날까지로 바꿔 넘긴다
       {title: `${one}소비자물가 상승률 (%, 1년 전 같은 달보다. 달마다 한 값) - ${MD[0]} ~ ${MD[ce < 0 ? MD.length - 1 : ce]}` + cut('cv'),
         cfg: cfg(MD, 'cv', 'clast', mticks, '주요국 소비자물가 상승률', zoom ? 300 : 260),
@@ -1195,6 +1222,31 @@ function rateRender() {
   gui('r_ytable').innerHTML = `<tr><th>해</th>${picked.map(c => `<th>${esc(RATES.areas[c].name)}</th>`).join('')}</tr>` +
     ys.map(y => `<tr><td>${y}년</td>${picked.map(c => cell(c, y)).join('')}</tr>`).join('');
 }
+// 인상기 분석 표(P014-012). 값은 common.py 의 hike_data 가 계산한 것이고 화면은 글로 풀기만 한다. 자료가 바뀌지 않는 한 한 번만 그린다.
+function hikeRender() {
+  const A = Object.values(HIKE.areas), px = v => v == null ? '-' : (v > 0 ? '+' : '') + v.toFixed(1) + '%';
+  const cell = (s, why) => `<td class="wrap" style="text-align:left">${s.on ? '<b>켜짐</b>' : '<span style="color:var(--muted)">꺼짐</span>'} <small>${why}</small></td>`;
+  const S = [
+    [`인상기 진입 <small>사이에 인하 없이 연속 인상 ${HIKE.min}회 이상</small>`, b => { const s = b.s1;
+      return cell(s, s.streak ? `연속 인상 ${s.streak}회 (${s.from} 부터, 마지막 ${s.last} ${pp(s.delta)}) · 지금 ${rp(s.rate)}` : s.last ? `마지막 변경이 인하 (${s.last} ${pp(s.delta)}) · 지금 ${rp(s.rate)}` : '변경 기록 없음'); }],
+    [`정점 미확인 <small>마지막 변경이 인상이고, 그 뒤 동결이 과거 인상기의 가장 짧은 정점 유지보다 짧음</small>`, b => { const s = b.s2;
+      return cell(s, b.s1.streak ? `마지막 인상 뒤 ${s.since}일 (과거 인상기의 정점 유지 최소 ${s.min_hold ?? '-'}일)` : '마지막 변경이 인상이 아님'); }],
+    [`실질금리 양수 전환 <small>금리 - 물가 상승률이 지난 ${HIKE.window}달 안에 0 아래에서 위로</small>`, b => { const s = b.s3;
+      return cell(s, s.real == null ? '물가 자료 없음' : `${s.month} 기준 ${pp(s.real)} (물가 ${rp(s.cpi)})` + (s.real > 0 ? s.up ? ` · ${s.up} 부터 양수` : ' · 자료 내내 양수' : ' · 아직 0 이하')); }],
+    [`인상기 중 지수 하락 <small>지금 연속 인상의 첫 인상일 뒤 지수가 ${HIKE.drop}% 아래</small>`, (b, a) => { const s = b.s4;
+      return cell(s, b.s1.streak ? `${esc(a.ix)} ${b.s1.from} -> ${a.ix_end}: ${px(s.ret)}` : '인상 중이 아님'); }]];
+  gui('r_board').innerHTML = `<tr><th style="text-align:left">신호</th>${A.map(a => `<th style="text-align:left">${esc(a.name)}</th>`).join('')}</tr>` +
+    S.map(([name, f]) => `<tr><td class="wrap" style="text-align:left">${name}</td>${A.map(a => f(a.board, a)).join('')}</tr>`).join('') +
+    `<tr><td style="text-align:left"><b>켜진 신호</b></td>${A.map(a => `<td style="text-align:left"><b>${a.board.count} / ${S.length}</b></td>`).join('')}</tr>`;
+  const mon = k => k === 365 ? '12개월' : Math.round(k / 30.4) + '개월';
+  gui('r_cycles').innerHTML = A.map(a => `<div class="ctitle">${esc(a.name)} 과거 인상기 (${HIKE.from.slice(0, 4)}년 이후, 연속 인상 ${HIKE.min}회 이상) - 정점 뒤 ${esc(a.ix)} 수익률 · 지수 자료 ${a.ix_end} 까지</div>` +
+    (a.cycles.length ? `<div class="tw"><table><tr><th>인상 횟수</th><th>첫 인상</th><th>마지막 인상 <small>정점</small></th><th>금리 <small>전 -> 정점</small></th><th>첫 인하</th><th>정점 유지 <small>일</small></th><th>첫 인상 -> 정점 지수</th>${HIKE.after.map(k => `<th>정점 뒤 ${mon(k)}</th>`).join('')}<th>정점 뒤 6개월 안 최대 하락</th></tr>` +
+      a.cycles.map(c => `<tr><td>${c.n}회</td><td>${c.first}</td><td>${c.peak}</td><td>${rp(c.low)} -> ${rp(c.rate)}</td><td>${c.cut || '아직 없음'}</td><td>${c.hold ?? '진행 중'}</td><td>${px(c.ix_hike)}</td>${HIKE.after.map(k => `<td>${px(c.after[k])}</td>`).join('')}<td>${px(c.mdd)}</td></tr>`).join('') + '</table></div>'
+    : `<div class="gap">연속 인상 ${HIKE.min}회 이상인 인상기가 없습니다.</div>`)).join('');
+  gui('r_hnote').textContent = `켜진 신호의 개수는 판정이 아니라 자리표시입니다. 과거 인상기는 ${A.map(a => `${a.name} ${a.cycles.length}번`).join(', ')}으로 표본이 적어 규칙으로 쓸 수 없습니다. 각 줄의 근거 숫자와 아래 표를 같이 읽으세요. 뜻은 아래 "읽는 법"의 인상기 분석 항목에 있습니다. 정책금리 ${RATES.end}, 물가 상승률은 나라마다 마지막 달까지의 자료입니다.`;
+}
+hikeRender();
+gui('r_hike').onchange = rateRender;
 const RMAIN = RATES.areas[RC[0]].group;  // 목록의 첫 묶음(assets.py 의 RATES 순서)
 gui('r_n').textContent = RC.length;
 gui('r_range').textContent = `${RATES.start} ~ ${RATES.end}`;
@@ -1244,10 +1296,10 @@ tabBtns[0].classList.add('on');
     ym[5].split('-r').filter(Boolean).forEach(c => { c = c.toUpperCase(); if (YR[c] && RATES.areas[c]) yrPick.set(c, ''); });
     setTab('year'); }
   // #rate, #rate-us-kr-jp(나라 부호 몇 개든), #rate-all, #rate-us-kr-all(둘은 색, 나머지는 회색), 끝에 -y10(기간: 최근 몇 년), -c20(세로축: 몇 %까지. 금리·물가에 같이)
-  // 보기는 그 뒤에 쓴다: -split(금리와 물가 따로), -o(해마다 겹쳐서), -o2010(2010년부터 겹쳐서). 안 쓰면 한 차트에.
+  // 보기는 그 뒤에 쓴다: -split(금리와 물가 따로), -o(해마다 겹쳐서), -o2010(2010년부터 겹쳐서). 안 쓰면 한 차트에. 맨 끝 -h 는 인상기 분석을 켠다.
   // 나라 부호 뒤에 글자가 더 오면 부호가 아니다 - 이 조건이 없으면 "-all" 의 "al" 을 나라로 읽는다.
-  const rm = location.hash.match(/^#rate((?:-[a-z]{2}(?![a-z]))*)(-all)?(?:-y(\d+))?(?:-c(\d+))?(?:-(split|o)(\d{4})?)?/);
-  if (rm) { if (rm[1] || rm[2]) rPick.clear();
+  const rm = location.hash.match(/^#rate((?:-[a-z]{2}(?![a-z]))*)(-all)?(?:-y(\d+))?(?:-c(\d+))?(?:-(split|o)(\d{4})?)?(-h)?/);
+  if (rm) { if (rm[1] || rm[2]) rPick.clear(); if (rm[7]) gui('r_hike').checked = true;
     rm[1].split('-').filter(Boolean).forEach(c => { c = c.toUpperCase(); if (RATES.areas[c]) pickAdd(rPick, c); });
     if (rm[2]) RC.forEach(c => pickAdd(rPick, c, true));
     if (rm[3] && [...gui('r_span').options].some(o => o.value === rm[3])) gui('r_span').value = rm[3];

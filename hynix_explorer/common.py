@@ -137,6 +137,129 @@ def rate_data():
     return out
 
 
+# ---------- 탭 4 "인상기 분석" (P014-012) ----------
+HIKE_MIN = 3  # 사이에 인하 없이 이 횟수 이상 연속으로 올리면 "인상기"로 센다. 물어본 것이 "3회 연속 인상이면"이었다
+HIKE_FROM = "1990-01-01"  # 미국은 1985-12 까지 시장 금리(날마다 움직임)라 그 시절은 횟수를 셀 수 없다. 자료가 1954년부터인 미국만 걸린다
+HIKE_IX = {"US": "spx", "KR": "kospi"}  # 나라 -> 정점 뒤 수익률을 잴 지수(assets.YEAR_IX 의 키)
+HIKE_AFTER = (91, 182, 365)  # 정점 뒤 며칠 뒤의 수익률을 보나(석 달·여섯 달·한 해)
+HIKE_DROP = -10.0  # 인상기 중 지수가 이보다 내려가면 신호
+REAL_WINDOW = 12  # 실질금리가 이 달수 안에 0 을 넘어왔으면 "양수 전환"
+
+
+def rate_changes(steps, start=HIKE_FROM):
+    """정책금리가 바뀐 날: [(날짜, 바뀐 뒤 값, 변화폭 %p)]. start 앞은 뺀다. 값이 없는 기간(None)의 앞뒤는 변화로 치지 않는다."""
+    out, prev = [], None
+    for d, v in steps:
+        if v is None:
+            prev = None
+            continue
+        if prev is not None and d >= start and v != prev:
+            out.append((d, v, round(v - prev, 4)))
+        prev = v
+    return out
+
+
+def rate_on(steps, date):
+    """그날의 정책금리(그날까지의 마지막 단계 값). 자료 앞이면 None."""
+    v = None
+    for d, x in steps:
+        if d > date:
+            break
+        v = x
+    return v
+
+
+def _pct(close, t0, days=0):
+    """t0 이후 첫 종가에서 t0 + days 이후 첫 종가까지의 수익률(%). 어느 쪽이든 없으면 None."""
+    a = close[close.index >= t0]
+    b = close[close.index >= pd.Timestamp(t0) + pd.Timedelta(days, "D")] if days else a
+    if a.empty or b.empty:
+        return None
+    return round(float(b.iloc[0] / a.iloc[0] - 1) * 100, 1)
+
+
+def hike_cycles(changes, close):
+    """연속 인상기: [{n, first, peak, rate, low, cut, hold, ix_hike, after: {일수: 수익률}, mdd}].
+    - n: 인상 횟수, first·peak: 첫·마지막 인상일, rate: 정점 금리, low: 첫 인상 전 금리, cut: 정점 뒤 첫 인하일(아직 없으면 None), hold: 정점 ~ 첫 인하 일수
+    - ix_hike: 첫 인상일 -> 정점의 지수 수익률, after: 정점 뒤 HIKE_AFTER 일의 수익률, mdd: 정점 뒤 182일 안 최저 종가까지의 하락률
+    지수는 그 시장의 달력 그대로라 "그 날 이후 첫 종가"로 잰다.
+    """
+    out, cur = [], []
+
+    def done(cur, cut):
+        (f, v0, dv0), (p, vp, _) = cur[0], cur[-1]
+        win = close[(close.index >= p) & (close.index <= pd.Timestamp(p) + pd.Timedelta(182, "D"))]
+        out.append({"n": len(cur), "first": f, "peak": p, "rate": vp, "low": round(v0 - dv0, 4), "cut": cut,
+                    "hold": (pd.Timestamp(cut) - pd.Timestamp(p)).days if cut else None,
+                    "ix_hike": _pct(close, f, (pd.Timestamp(p) - pd.Timestamp(f)).days) if p != f else 0.0,
+                    "after": {str(k): _pct(close, p, k) for k in HIKE_AFTER},
+                    "mdd": round(float(win.min() / win.iloc[0] - 1) * 100, 1) if len(win) else None})
+
+    for d, v, dv in changes:
+        if dv > 0:
+            cur.append((d, v, dv))
+            continue
+        if len(cur) >= HIKE_MIN:
+            done(cur, d)
+        cur = []
+    if len(cur) >= HIKE_MIN:
+        done(cur, None)
+    return out
+
+
+def hike_board(steps, last, cpi, close, cycles):
+    """신호판 4개. 예측이 아니라 "지금이 과거 인상기의 어느 자리인가"다. 켜짐(on)과 그 근거 숫자를 같이 준다.
+    s1 인상기 진입: 끝에서부터 연속 인상이 HIKE_MIN 회 이상.
+    s2 정점 미확인: 마지막 변경이 인상이고, 그 뒤 지난 날수가 과거 인상기의 가장 짧은 정점 유지(hold)보다 짧다.
+    s3 실질금리 양수 전환: 금리 - 물가 상승률이 REAL_WINDOW 달 안에 0 이하에서 0 위로 넘어왔다.
+    s4 인상기 중 지수 하락: 지금 연속 인상의 첫 인상일 뒤 지수가 HIKE_DROP % 아래.
+    """
+    ch = rate_changes(steps)
+    streak = 0
+    while streak < len(ch) and ch[-1 - streak][2] > 0:
+        streak += 1
+    lastc = ch[-1] if ch else None
+    since = (pd.Timestamp(last) - pd.Timestamp(lastc[0])).days if lastc else None
+    holds = [c["hold"] for c in cycles if c["hold"] is not None]
+    s1 = {"on": streak >= HIKE_MIN, "streak": streak, "from": ch[-streak][0] if streak else None,
+          "last": lastc[0] if lastc else None, "delta": lastc[2] if lastc else None, "rate": rate_on(steps, last)}
+    s2 = {"on": bool(streak and holds and since < min(holds)), "since": since, "min_hold": min(holds) if holds else None}
+    # 실질금리: 달마다 그 달 마지막 날의 금리 - 그 달의 물가 상승률. 0 이하 -> 0 위로 넘어온 마지막 달을 찾는다
+    s3 = {"on": False, "real": None, "cpi": None, "month": None, "up": None}
+    if cpi:
+        months = pd.period_range(cpi["from"], periods=len(cpi["v"]), freq="M")
+        real = []
+        for m, v in zip(months, cpi["v"]):
+            r = rate_on(steps, min(m.end_time.strftime("%Y-%m-%d"), last))
+            if v is not None and r is not None:
+                real.append((m.strftime("%Y-%m"), round(r - v, 3), v))
+        if real:
+            s3["month"], s3["real"], s3["cpi"] = real[-1]
+            up = None
+            for k in range(1, len(real)):
+                if real[k - 1][1] <= 0 < real[k][1]:
+                    up = real[k][0]
+            if s3["real"] > 0 and up:
+                s3["up"] = up
+                s3["on"] = (pd.Period(s3["month"], "M") - pd.Period(up, "M")).n < REAL_WINDOW
+    ix = _pct(close, s1["from"], (close.index[-1] - pd.Timestamp(s1["from"])).days) if streak else None
+    s4 = {"on": bool(streak and ix is not None and ix < HIKE_DROP), "ret": ix}
+    return {"s1": s1, "s2": s2, "s3": s3, "s4": s4, "count": sum(s["on"] for s in (s1, s2, s3, s4))}
+
+
+def hike_data(rates):
+    """탭 4 "인상기 분석"에 싣는 것 전부. rates 는 rate_data() 의 결과(같은 것을 두 번 계산하지 않으려고 받는다).
+    build.py 와 check.py 가 같이 쓴다."""
+    out = {"min": HIKE_MIN, "from": HIKE_FROM, "after": list(HIKE_AFTER), "drop": HIKE_DROP, "window": REAL_WINDOW, "areas": {}}
+    for c, ix in HIKE_IX.items():
+        a = rates["areas"][c]
+        close = year_close(ix)
+        cycles = hike_cycles(rate_changes(a["steps"]), close)
+        out["areas"][c] = {"name": a["name"], "ix": YEAR_IX[ix]["name"], "ix_end": close.index[-1].strftime("%Y-%m-%d"),
+                           "cycles": cycles, "board": hike_board(a["steps"], a["last"], a.get("cpi"), close, cycles)}
+    return out
+
+
 def on_calendar(px, cal):
     """미국 일별 자료를 한국 달력(cal)에 얹는다. 날짜는 미국 날짜 그대로다(하루 늦추지 않는다).
 

@@ -16,7 +16,8 @@ from pathlib import Path
 import pandas as pd
 
 from assets import ASSETS, KR_BENCH, RATES, YEAR_IX
-from common import D, prices, rate_data, year_close, year_data
+from common import D, hike_data, prices, rate_data, year_close, year_data
+from events import auto_rows, load_events
 
 FLOW_FROM = pd.Timestamp("2005-01-03")  # 네이버 증권의 투자자별 수급이 시작되는 날
 SHOW_FROM = "1997-01-01"
@@ -222,6 +223,18 @@ def check_rates():
             warn(f"소비자물가 {name}: {m} 까지만 왔다(가장 늦게까지 온 나라는 {max(cpi_end.values())})")
 
 
+def check_events():
+    """events/events.csv 의 자동 줄(금리 변경일)이 지금 BIS 자료와 같은지. 다르면 events.py 를 안 돌린 것이다."""
+    rows = load_events()
+    want = auto_rows(rate_data())
+    have = [r for r in rows if r["checked"] == "auto"]
+    if have != want:
+        err(f"events/events.csv 의 자동 줄({len(have)}개)이 BIS 자료로 다시 만든 것({len(want)}개)과 다르다 - python events.py 를 돌린다")
+    bad = [r for r in rows if r["checked"] != "auto" and (len(r["date"]) != 10 or r["country"] not in ("US", "KR") or not r["title"])]
+    if bad:
+        err(f"events/events.csv 에 날짜(YYYY-MM-DD)·나라(US/KR)·제목이 빠진 줄 {len(bad)}개: {bad[:2]}")
+
+
 def check_html(path):
     path = Path(path).resolve()
     html = path.read_text(encoding="utf-8")
@@ -242,6 +255,13 @@ def check_html(path):
     mark4 = "const RATES = "
     if mark4 not in html or json.JSONDecoder().raw_decode(html, html.index(mark4) + len(mark4))[0] != rate_data():
         err("HTML 에 든 정책금리·소비자물가(탭 4)가 data/ 의 bis_rates.csv, bis_cpi.csv 로 다시 계산한 값과 다르다")
+    rates = rate_data()
+    mark5 = "const HIKE = "
+    if mark5 not in html or json.JSONDecoder().raw_decode(html, html.index(mark5) + len(mark5))[0] != hike_data(rates):
+        err("HTML 에 든 인상기 분석(탭 4)이 정책금리·지수로 다시 계산한 값과 다르다")
+    mark6 = "const EVENTS = "
+    if mark6 not in html or json.JSONDecoder().raw_decode(html, html.index(mark6) + len(mark6))[0] != load_events():
+        err("HTML 에 든 날짜별 이슈(탭 1 툴팁)가 events/events.csv 와 다르다")
     if not errors:
         print("HTML 에 든 값이 data/ 와 같다:", len(ALL), "대상,", ALL["kospi"]["R"]["series"]["date"][-1], "까지")
 
@@ -272,5 +292,6 @@ if __name__ == "__main__":
         check_data()
         check_years()
         check_rates()
+        check_events()
     print(f"검사 끝: 오류 {len(errors)}건")
     sys.exit(1 if errors else 0)
