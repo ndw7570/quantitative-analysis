@@ -1,7 +1,10 @@
 """update.py 와 check.py 의 작은 판단들. 전체 실행은 update.py 를 실제로 돌려서 본다(여기서는 돌리지 않는다)."""
+import contextlib
+import io
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import pandas as pd
 
@@ -85,6 +88,58 @@ class Layout(unittest.TestCase):
             self.assertTrue(set(a["reg"]) | set(a["cmp"]) <= known, k)
             self.assertNotIn(k, a["reg"], k)  # 자기로 자기를 설명하지 않는다
             self.assertIn((a["market"], a["kind"]), check.BIG_MOVE, k)
+
+
+class YearsLayout(unittest.TestCase):
+    def test_template_has_one_years_slot_where_check_looks_for_it(self):
+        html = (HERE / "template.html").read_text(encoding="utf-8")
+        self.assertEqual(html.count("__YIX__"), 1)
+        self.assertIn("const YIX = __YIX__", html)  # check.py 가 이 표시 뒤에서 탭 3 자료를 읽는다
+
+    def test_every_index_of_tab3_is_something_fetch_downloads(self):
+        # 목록에만 넣고 받는 쪽에 안 넣으면 파일이 없어 build 가 죽는다
+        from assets import BENCH, KR_BENCH, YEAR_IX
+        got = {"us": set(BENCH) | {k for k, a in ASSETS.items() if a["market"] == "us"},
+               "kr": set(KR_BENCH) | {k for k, a in ASSETS.items() if a["market"] == "kr"}}
+        for k, a in YEAR_IX.items():
+            self.assertIn(k, got[a["market"]], k)
+        self.assertEqual(list(YEAR_IX), ["spx", "nasdaq", "kospi", "kosdaq"])  # 전에 쓰던 주소(#year-2018)는 첫 지수로 열린다
+
+
+class CheckYears(unittest.TestCase):
+    """탭 3 값은 틀려도 선이 그려진다. 지수 기준이 중간에 바뀐 자료(코스닥은 2004년에 100 -> 1,000)를 걸러야 한다."""
+
+    def run_check(self, closes):
+        import common
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        d = Path(tmp.name)
+        df = pd.DataFrame({"close": list(closes.values())}, index=pd.to_datetime(list(closes)))
+        df.to_csv(d / "naver_px_kosdaq.csv", encoding="utf-8-sig")
+        ix = {"kosdaq": {"name": "코스닥", "market": "kr"}}
+        with mock.patch.object(check, "D", d), mock.patch.object(common, "D", d), mock.patch.object(check, "errors", []), \
+                mock.patch.object(check, "YEAR_IX", ix), mock.patch.object(common, "YEAR_IX", ix), \
+                contextlib.redirect_stdout(io.StringIO()) as out:
+            check.check_years()
+            return list(check.errors), out.getvalue()
+
+    def test_ordinary_years_pass(self):
+        errors, out = self.run_check({"2023-12-28": 800.0, "2024-06-03": 880.0, "2024-12-30": 790.0, "2025-01-02": 710.0})
+        self.assertEqual((errors, out), ([], ""))
+
+    def test_tenfold_jump_inside_a_year_is_an_error_and_a_warning(self):
+        errors, out = self.run_check({"2023-12-28": 80.0, "2024-06-03": 82.0, "2024-06-04": 820.0, "2025-01-02": 830.0})
+        self.assertEqual(len(errors), 1)
+        self.assertIn("2024년", errors[0])
+        self.assertIn("[주의] 탭 3 코스닥: 하루 등락률", out)
+
+    def test_missing_file_is_an_error_not_a_crash(self):
+        import common
+        with tempfile.TemporaryDirectory() as t, mock.patch.object(check, "D", Path(t)), mock.patch.object(common, "D", Path(t)), \
+                mock.patch.object(check, "errors", []), contextlib.redirect_stdout(io.StringIO()):
+            check.check_years()
+            self.assertEqual(len(check.errors), 1)
+            self.assertIn("naver_px_kosdaq.csv", check.errors[0])
 
 
 class RatesLayout(unittest.TestCase):

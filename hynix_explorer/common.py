@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from assets import ASSETS, RATES
+from assets import ASSETS, RATES, YEAR_IX
 
 D = Path(__file__).parent / "data"
 WHO = ("foreign", "inst", "indiv")
@@ -60,7 +60,26 @@ def year_paths(close):
     return {"end": last.strftime("%Y-%m-%d"), "days": YEAR_DAYS, "years": years}
 
 
-RATE_FROM = "1995-01-01"  # 탭 3 과 같은 해부터 보여 준다
+def year_close(key):
+    """탭 3 에서 고르는 지수(assets.YEAR_IX)의 종가. 그 시장의 달력 그대로다 - 한국 달력에 얹지 않는다.
+    얹으면 미국의 한 해를 날짜대로 그릴 수 없다(한국이 쉰 날의 미국 종가가 다음 날로 밀린다)."""
+    if YEAR_IX[key]["market"] == "us":
+        return us(key)
+    return pd.read_csv(D / f"naver_px_{key}.csv", index_col=0, parse_dates=True)["close"].dropna()
+
+
+def year_data():
+    """탭 3 에 싣는 것 전부: 지수마다 year_paths. 달력 칸(days)은 모든 지수가 같아서 한 번만 싣는다.
+    build.py 와 check.py 가 같이 쓴다 - 따로 만들면 "HTML 에 든 값이 자료와 같은가"를 비교할 수 없다.
+    지수마다 첫 해와 마지막 날(end)이 다르다. 코스닥은 1996-07 부터 있어 1997년이 첫 해다."""
+    idx = {}
+    for k, a in YEAR_IX.items():
+        p = year_paths(year_close(k))
+        idx[k] = {"name": a["name"], "market": a["market"], "end": p["end"], "years": p["years"]}
+    return {"days": YEAR_DAYS, "idx": idx}
+
+
+RATE_FROM = "1995-01-01"  # 탭 3 의 S&P500 과 같은 해부터 보여 준다
 RATE_FILL = 31  # 이 날수까지 빈 곳은 직전 값을 잇는다. 받은 자료에서 연휴로 빈 가장 긴 곳이 15일이었다(태국 2020-11, 2026-11-26 확인)
 
 

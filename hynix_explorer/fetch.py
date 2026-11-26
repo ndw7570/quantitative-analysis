@@ -24,7 +24,7 @@ from pathlib import Path
 import pandas as pd
 import requests
 
-from assets import ASSETS, BENCH, RATES
+from assets import ASSETS, BENCH, KR_BENCH, RATES
 
 OUT = Path(__file__).parent / "data"
 OUT.mkdir(exist_ok=True)
@@ -59,14 +59,16 @@ def num(s):
 
 
 def kr_price():
-    """한국 종목·코스피의 일별 시가·고가·저가·종가·거래량. 네이버 증권 siseJson.
+    """한국 종목·코스피·코스닥의 일별 시가·고가·저가·종가·거래량. 네이버 증권 siseJson.
+
+    코스닥(assets.KR_BENCH)은 대상이 아니라 탭 3 만 쓴다. 1996-07-02 부터 온다(2026-11-26 확인, 첫날 1,001.7).
 
     종목 가격은 수정주가다(삼성전자 2018년 50:1 분할 이전이 5만 원대로 온다). 거래량은 그때 주식 수 그대로다.
     전에는 pykrx 를 썼는데 한 종목에 3,000거래일까지만 와서 2014-08 이전을 받을 수 없었다.
     겹치는 2,999일은 두 출처의 시가·종가·거래량이 한 줄도 다르지 않았다(2026-11-25, 하이닉스·삼성전자·삼성전기).
     매번 전체를 다시 받는다 - 분할이 생기면 과거 가격이 통째로 바뀌므로 이어 붙이면 안 된다.
     """
-    for name, code in KR.items():
+    for name, code in {**KR, **KR_BENCH}.items():
         url = (f"https://api.finance.naver.com/siseJson.naver?symbol={code}&requestType=1"
                f"&startTime={S}&endTime={E}&timeframe=day")
         text = requests.get(url, headers=HEAD, timeout=30).text

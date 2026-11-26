@@ -117,6 +117,27 @@ class YearPaths(unittest.TestCase):
         self.assertIsNone(self.at("2025", "12-31"))
 
 
+class YearData(Base):
+    def test_each_index_is_read_on_its_own_calendar_and_days_are_shared(self):
+        # 미국 지수는 야후 파일(Close), 한국 지수는 네이버 파일(close)에서 읽는다. 시작 해가 달라도 된다
+        self.csv("yf_spx.csv", [("2023-12-29", 100.0), ("2024-12-31", 120.0), ("2025-01-02", 132.0)], ["Close"])
+        self.csv("naver_px_kosdaq.csv", [("2024-12-30", 1, 1, 1, 800.0, 5), ("2025-01-02", 1, 1, 1, 720.0, 5)],
+                 ["open", "high", "low", "close", "volume"])
+        ix = {"spx": {"name": "S&P500", "market": "us"}, "kosdaq": {"name": "코스닥", "market": "kr"}}
+        with mock.patch.object(common, "YEAR_IX", ix):
+            r = common.year_data()
+        self.assertEqual(list(r), ["days", "idx"])
+        self.assertEqual(len(r["days"]), 366)
+        self.assertEqual(list(r["idx"]), ["spx", "kosdaq"])  # 화면 목록 순서는 assets.YEAR_IX 순서다
+        spx, kq = r["idx"]["spx"], r["idx"]["kosdaq"]
+        self.assertEqual((spx["name"], spx["market"], spx["end"]), ("S&P500", "us", "2025-01-02"))
+        self.assertEqual(list(spx["years"]), ["2024", "2025"])
+        self.assertEqual(list(kq["years"]), ["2025"])  # 받은 첫 해(2024)는 전년 말 종가가 없어 빠진다
+        at = r["days"].index("01-02")
+        self.assertEqual((spx["years"]["2025"][at], kq["years"]["2025"][at]), (10, -10))
+        self.assertNotIn("days", spx)  # 달력 칸은 지수마다 싣지 않는다(파일만 커진다)
+
+
 class Flows(Base):
     def test_stock_shares_are_rescaled_by_the_split_ratio(self):
         # 2026-01-07 에 50:1 분할. 수급 쪽 종가·주식 수는 분할 전 값 그대로, 가격 쪽은 수정주가다.

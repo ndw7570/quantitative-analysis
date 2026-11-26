@@ -55,6 +55,15 @@ CMP_ENT = ["hynix", "samsung", "semco", "kospi", "nvidia", "micron", "nasdaq", "
 # 대상은 아니고 설명 변수·비교선으로만 쓰는 미국 지수
 BENCH = {"sox": "^SOX", "spx": "^GSPC"}
 NAMES = {**{k: a["name"] for k, a in ASSETS.items()}, "sox": "SOX", "spx": "S&P500"}
+# 대상은 아니고 가격만 받는 한국 지수(BENCH 의 한국 쪽). 값은 네이버 siseJson 의 symbol 이다. 탭 3 만 쓴다.
+# 대상(ASSETS)에 넣지 않은 이유: 넣으면 탭 1·2 의 모델 계산과 수급 수집까지 따라붙는데, 물어본 것은 연초부터의 수익률뿐이다.
+KR_BENCH = {"kosdaq": "KOSDAQ"}
+# 탭 3 "여러 해 겹쳐 보기"에서 고르는 지수. 키는 받은 파일 이름의 끝이고(us -> yf_<키>.csv, kr -> naver_px_<키>.csv)
+# 순서가 화면 목록의 순서다. 첫 줄이 처음 열었을 때의 지수다(방송 화면이 견준 것이 S&P500 이었다).
+YEAR_IX = {
+    "spx": {"name": "S&P500", "market": "us"}, "nasdaq": {"name": "나스닥 종합", "market": "us"},
+    "kospi": {"name": "코스피", "market": "kr"}, "kosdaq": {"name": "코스닥", "market": "kr"},
+}
 # 탭 4 "주요국 정책금리"에 싣는 나라. 키는 국제결제은행(BIS)의 지역 부호, 값은 (화면 이름, 고르기 목록의 묶음).
 # 순서가 화면의 목록·표 순서다. 첫 묶음이 "주요 6개" 단추가 고르는 나라다.
 # 이름은 차트 오른쪽 끝 이름표에 들어가야 해서 짧게 쓴다(남아프리카공화국 -> 남아공, 사우디아라비아 -> 사우디).

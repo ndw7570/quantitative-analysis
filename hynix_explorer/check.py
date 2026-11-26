@@ -15,8 +15,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from assets import ASSETS, RATES
-from common import D, prices, rate_data, us, year_paths
+from assets import ASSETS, KR_BENCH, RATES, YEAR_IX
+from common import D, prices, rate_data, year_close, year_data
 
 FLOW_FROM = pd.Timestamp("2005-01-03")  # 네이버 증권의 투자자별 수급이 시작되는 날
 SHOW_FROM = "1997-01-01"
@@ -28,6 +28,9 @@ BROWSERS = [r"C:\Program Files\Google\Chrome\Application\chrome.exe",
 # 처음 열었을 때 그려지는 차트 수. 화면 구성을 바꾸면 같이 고친다.
 # 탭 1 이 15개(2026-11-25 에 센 값), 탭 3 과 탭 4 가 1개씩(숨겨진 채로도 한 번 그린다 - template.html 의 yearRender, rateRender).
 MIN_CHARTS = 17
+# 탭 3 의 한 해 수익률이 이 범위를 벗어나면 단위가 바뀌었거나 지수 기준이 중간에 달라진 것으로 본다.
+# 받은 자료의 최고는 코스닥 1999년 +240.7%, 최저는 코스닥 2000년 -79.5% 다(2026-11-26 확인).
+YEAR_RANGE = (-90, 400)
 RATE_LATE = 45  # 정책금리가 이 날수 넘게 뒤처진 나라는 알린다. BIS 는 나라마다 며칠에서 몇 주 늦게 싣는다
 errors = []
 
@@ -118,7 +121,9 @@ def check_data():
 
     # ---------- 받은 원자료 ----------
     kr = [k for k, a in ASSETS.items() if a["market"] == "kr"]
-    ends = {k: pd.read_csv(D / f"naver_px_{k}.csv", index_col=0, parse_dates=True).index.max() for k in kr}
+    # 코스닥(KR_BENCH)은 대상이 아니라 수급이 없다. 가격의 마지막 날만 같이 본다.
+    ends = {k: pd.read_csv(D / f"naver_px_{k}.csv", index_col=0, parse_dates=True).index.max()
+            for k in [*kr, *KR_BENCH] if (D / f"naver_px_{k}.csv").exists()}
     if len(set(ends.values())) > 1:
         # 거래정지 중인 종목도 줄은 온다(거래량 0). 마지막 날이 다르면 그 종목만 덜 받은 것이다.
         err(f"한국 가격 파일의 마지막 날이 서로 다르다 {({k: str(v.date()) for k, v in ends.items()})}")
@@ -143,6 +148,32 @@ def check_data():
     gap = (max(ends.values()) - max(us_ends.values())).days
     if gap > 4:  # 주말·연휴를 끼면 며칠은 벌어진다
         warn(f"미국 가격이 한국 가격보다 {gap}일 뒤처져 있다")
+
+
+def check_years():
+    """탭 3 의 지수별 연초부터 수익률. 값이 틀려도 선은 멀쩡히 그려지므로 해가 이어지는지와 값의 범위를 본다."""
+    files = {k: D / (f"yf_{k}.csv" if a["market"] == "us" else f"naver_px_{k}.csv") for k, a in YEAR_IX.items()}
+    lost = [p.name for p in files.values() if not p.exists()]
+    if lost:
+        err(f"탭 3 에 쓸 지수 파일이 없다: {lost} (fetch.py kr_price us 로 받는다)")
+        return
+    for k, a in year_data()["idx"].items():
+        yrs, name = list(a["years"]), a["name"]
+        if yrs != [str(y) for y in range(int(yrs[0]), int(a["end"][:4]) + 1)]:
+            err(f"탭 3 {name}: 해가 이어지지 않는다 {yrs[:3]}..{yrs[-3:]}")
+        for y, v in a["years"].items():
+            have = [x for x in v if x is not None]
+            if y != a["end"][:4] and len(have) != len(v):
+                err(f"탭 3 {name}: 끝난 해 {y}년에 빈 칸이 {len(v) - len(have)}개 있다")
+            if min(have) < YEAR_RANGE[0] or max(have) > YEAR_RANGE[1]:
+                err(f"탭 3 {name}: {y}년 수익률이 {min(have)} ~ {max(have)} % 다(단위나 지수 기준이 중간에 바뀌었다)")
+        if k in ASSETS:
+            continue  # 대상인 지수(코스피·나스닥)의 하루 등락은 check_data 가 이미 본다
+        chg = year_close(k).pct_change() * 100
+        big = chg[chg.abs() > BIG_MOVE[(a["market"], "index")]]
+        if len(big):
+            warn(f"탭 3 {name}: 하루 등락률이 {BIG_MOVE[(a['market'], 'index')]}% 를 넘는 날 {len(big)}일 - "
+                 + ", ".join(f"{d.date()} {v:+.1f}%" for d, v in big.iloc[:6].items()) + (" ..." if len(big) > 6 else ""))
 
 
 def check_rates():
@@ -178,9 +209,9 @@ def check_html(path):
     for k in ASSETS:
         if ALL[k]["R"] != load(f"result_{k}.json") or ALL[k]["G"] != load(f"signals_{k}.json"):
             err(f"{k}: HTML 에 든 값이 data/ 의 결과와 다르다")
-    mark3 = "const SPX = "
-    if mark3 not in html or json.JSONDecoder().raw_decode(html, html.index(mark3) + len(mark3))[0] != year_paths(us("spx")):
-        err("HTML 에 든 S&P500 연도별 값(탭 3)이 data/yf_spx.csv 로 다시 계산한 값과 다르다")
+    mark3 = "const YIX = "
+    if mark3 not in html or json.JSONDecoder().raw_decode(html, html.index(mark3) + len(mark3))[0] != year_data():
+        err("HTML 에 든 지수별 연도 값(탭 3)이 data/ 의 종가로 다시 계산한 값과 다르다")
     mark4 = "const RATES = "
     if mark4 not in html or json.JSONDecoder().raw_decode(html, html.index(mark4) + len(mark4))[0] != rate_data():
         err("HTML 에 든 정책금리(탭 4)가 data/bis_rates.csv 로 다시 계산한 값과 다르다")
@@ -212,6 +243,7 @@ if __name__ == "__main__":
         check_html(sys.argv[2])
     else:
         check_data()
+        check_years()
         check_rates()
     print(f"검사 끝: 오류 {len(errors)}건")
     sys.exit(1 if errors else 0)

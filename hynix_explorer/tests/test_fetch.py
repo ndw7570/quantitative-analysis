@@ -54,7 +54,7 @@ class Base(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.out = Path(tmp.name)
-        for p in (mock.patch.multiple(fetch, OUT=self.out, STOCKS={"hynix": "000660"}, KR={"hynix": "000660"},
+        for p in (mock.patch.multiple(fetch, OUT=self.out, STOCKS={"hynix": "000660"}, KR={"hynix": "000660"}, KR_BENCH={},
                                       S="20250101", FULL=False),
                   mock.patch.object(fetch.time, "sleep", lambda s: None),
                   contextlib.redirect_stdout(io.StringIO())):
@@ -176,6 +176,15 @@ class KrPrice(Base):
         self.assertTrue(df.index.is_monotonic_increasing)
         self.assertEqual(list(df.columns), ["open", "high", "low", "close", "volume"])
         self.assertEqual(df["close"].iloc[-1], 249)
+
+    def test_bench_index_is_asked_by_its_symbol_and_saved_like_the_others(self):
+        # 코스닥은 대상(ASSETS)이 아니라서 KR 에 없다. 그래도 같은 길로 받아 같은 이름 규칙으로 둔다(탭 3 이 읽는다)
+        asked = []
+        srv = mock.Mock(get=lambda url, **kw: asked.append(url) or Resp(self.text(150)))
+        with mock.patch.object(fetch, "KR_BENCH", {"kosdaq": "KOSDAQ"}):
+            self.run_job(fetch.kr_price, srv, date(2026, 11, 24))
+        self.assertEqual([("symbol=000660&" in asked[0]), ("symbol=KOSDAQ&" in asked[1]), len(asked)], [True, True, 2])
+        self.assertEqual(len(self.saved("naver_px_kosdaq.csv")), 150)
 
 
 class Us(Base):
