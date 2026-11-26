@@ -100,7 +100,20 @@ class Events(unittest.TestCase):
         rows = events.auto_rows(rates)
         self.assertEqual([(r["date"], r["country"]) for r in rows], [("1997-03-25", "US"), ("1998-09-29", "US"), ("2000-02-10", "KR")])
         self.assertEqual(rows[0]["title"], "미국 연준 정책금리 인상 +0.25%p -> 5.5%")
-        self.assertEqual((rows[0]["category"], rows[0]["source"], rows[0]["checked"]), ("rate", "BIS", "auto"))
+        self.assertEqual((rows[0]["asset"], rows[0]["category"], rows[0]["source"], rows[0]["checked"]), ("", "rate", "BIS", "auto"))
+
+    def test_merge_keeps_well_formed_new_rows_once_and_reports_the_rest(self):
+        rows = [{"date": "2024-01-25", "country": "KR", "asset": "hynix", "category": "earnings", "title": "4분기 실적", "summary": "", "source": "", "checked": "yes"}]
+        new = [{"date": "2024-01-25", "country": "KR", "asset": "hynix", "category": "earnings", "title": "4분기 실적"},  # 이미 있다
+               {"date": "2024-04-25", "country": "KR", "asset": "hynix", "category": "earnings", "title": " 1분기 실적 ", "source": "https://x"},
+               {"date": "2024-4-25", "country": "KR", "asset": "hynix", "category": "earnings", "title": "날짜 틀림"},
+               {"date": "2024-05-01", "country": "KR", "asset": "nope", "category": "earnings", "title": "없는 종목"},
+               {"date": "2024-05-02", "country": "KR", "asset": "", "category": "news", "title": "분류 틀림"},
+               {"date": "2024-05-03", "country": "KR", "asset": "", "category": "policy", "title": ""}]
+        added, bad = events.merge_rows(rows, new)
+        self.assertEqual(added, 1)
+        self.assertEqual([r["title"] for r in rows], ["4분기 실적", "1분기 실적"])  # 앞뒤 공백을 지운다
+        self.assertEqual([w.split(":")[0] for _, w in bad], ["날짜 모양이 아니다", "없는 종목 키", "분류가 목록에 없다", "제목이 없다"])
 
     def test_rewriting_keeps_hand_written_rows_and_replaces_auto_rows(self):
         events.write_events([{"date": "2020-01-02", "country": "KR", "category": "policy", "title": "손으로 적음", "summary": "", "source": "", "checked": "yes"},

@@ -17,7 +17,7 @@ import pandas as pd
 
 from assets import ASSETS, KR_BENCH, RATES, YEAR_IX
 from common import D, hike_data, prices, rate_data, year_close, year_data
-from events import auto_rows, load_events
+from events import auto_rows, bad_reason, load_events
 
 FLOW_FROM = pd.Timestamp("2005-01-03")  # 네이버 증권의 투자자별 수급이 시작되는 날
 SHOW_FROM = "1997-01-01"
@@ -230,9 +230,10 @@ def check_events():
     have = [r for r in rows if r["checked"] == "auto"]
     if have != want:
         err(f"events/events.csv 의 자동 줄({len(have)}개)이 BIS 자료로 다시 만든 것({len(want)}개)과 다르다 - python events.py 를 돌린다")
-    bad = [r for r in rows if r["checked"] != "auto" and (len(r["date"]) != 10 or r["country"] not in ("US", "KR") or not r["title"])]
+    bad = [(r, bad_reason(r)) for r in rows if r["checked"] != "auto"]
+    bad = [(r, w) for r, w in bad if w]
     if bad:
-        err(f"events/events.csv 에 날짜(YYYY-MM-DD)·나라(US/KR)·제목이 빠진 줄 {len(bad)}개: {bad[:2]}")
+        err(f"events/events.csv 에 모양이 틀린 줄 {len(bad)}개: " + "; ".join(f"{r['date']} {r['title'][:30]!r} - {w}" for r, w in bad[:3]))
 
 
 def check_html(path):
