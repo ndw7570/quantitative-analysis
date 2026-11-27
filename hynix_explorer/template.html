@@ -1567,7 +1567,9 @@ const sPickers = [[gui('s_add'), gui('s_chips'), gui('s_wn'), gui('s_wadd')], [g
     pickAdd(sPick, String(w)); sChanged(); };
   return draw; });
 ['20', '60', '120'].forEach(w => pickAdd(sPick, w));  // 처음 값: 짧은 창·중간·긴 창 하나씩
-function sChanged() { slopeRender(); if (gui('zv').classList.contains('on') && gui('z_ctrl').contains(gui('s_zctrl'))) zoomDraw(); }
+// 팝업이 열려 있으면 팝업도 다시 그린다. 팝업은 열릴 때의 make(그때의 창 목록을 쥔 닫힘 함수)를 zMake 로 잡아 두므로,
+// 새 make 로 바꿔 주지 않으면 화면만 바뀌고 팝업은 옛 창 목록 그대로다(2026-11-27 사용자 보고).
+function sChanged() { slopeRender(); if (gui('zv').classList.contains('on') && gui('z_ctrl').contains(gui('s_zctrl'))) { zMake = slopeRender.make; zoomDraw(); } }
 // 상태별 통계: trend.py 의 trend_stats 를 화면에서(창 길이가 임의라서). 진입(구간 첫날)만 센다. 첫날은 진입이 아니다.
 function sStats(ST, C) {
   const rs = sRuns(ST), total = ST.filter(s => s != null).length, out = {};
@@ -1638,7 +1640,7 @@ function slopeRender() {
              {name: `±${SP.t_in}`, vals: [tConst(nn, SP.t_in), tConst(nn, -SP.t_in)], color: '--ink2', dash: '5 3', fmt: tv, noEnd: true, quiet: true},
              {name: `±${SP.t_out}`, vals: [tConst(nn, SP.t_out), tConst(nn, -SP.t_out)], color: '--muted', dash: '2 3', fmt: tv, noEnd: true, quiet: true}]}}]};
   };
-  drawSet(gui('s_charts'), make(a0, b0).items, make);
+  drawSet(gui('s_charts'), make(a0, b0).items, make); slopeRender.make = make;  // 팝업이 열린 채 창을 바꿀 때 sChanged 가 쓴다
   // 이 기간의 상태 구간(표 기준. 기간 첫날에 걸친 구간은 진짜 시작일부터)
   const C = Sx.close, rows = []; let i = a0; while (i > first && ST[i - 1] === ST[a0]) i--;
   for (; i <= b0;) { const s = ST[i]; let j = i; while (j < N - 1 && ST[j + 1] === s) j++;
