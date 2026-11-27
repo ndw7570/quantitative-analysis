@@ -369,7 +369,7 @@ td small,th small{color:var(--muted);font-weight:400}
     <li><b>왜 "|t| 가 가장 큰 창"이 아닌가</b>: t 는 같은 추세라도 창이 길수록 커집니다(창 길이의 제곱근에 비례). 그래서 가장 큰 t 를 고르면 거의 늘 250일 창이 뽑히고 코스피의 7,445일 중 7,436일이 "상승"이 됐습니다. R² 가 가장 큰 창도 큰 상승 뒤 몇 달은 250일 창이 "가장 곧아" 급락 중에도 상승으로 남았습니다. 최근성을 규칙에 직접 넣은 것이 합의 길이입니다.</li>
     <li><b>창 고르기</b>: 목록(<span class="s_wins"></span>거래일)에서 고르거나 "다른 길이"로 <span class="s_wmin"></span>~<span class="s_wmax"></span> 아무 길이를 더합니다. 고른 창마다 같은 색으로 <b>구간 마지막 날의 회귀선</b>(종가 차트, 점선), 기울기 선, t 선이 겹칩니다. 짧은 창은 최근을, 긴 창은 평균을 말하므로 두셋을 겹쳐 보면 "최근이 꺾였는데 긴 추세는 아직"인 때가 보입니다. 긴 창(120일 넘게)은 t 가 거의 늘 2 를 넘습니다 - 아래 항목.</li>
     <li><b>t 의 문턱 2 는 독립 표본의 기준</b>이고, 주가처럼 어제 값이 오늘 값에 이어지는 자료에서는 실제보다 크게 나옵니다. "통계적으로 유의하다"로 읽지 말고 세기의 눈금으로만 읽으세요. 창 안에 꺾임이 있으면 기울기는 그 사이의 평균입니다(창 길이가 짧을수록 최근, 길수록 평균).</li>
-    <li><b>기점과 직접 구간</b>: 기점(날짜 또는 "며칠 전")을 옮기면 모든 회귀선이 그날까지의 종가로 다시 그어지고 요약 줄도 그날 기준이 됩니다 - "그때 이 규칙은 뭐라고 했나"를 보는 길입니다. 띠와 아래 차트의 선은 날마다 그날까지의 값이라 기점과 상관없이 같습니다. 직접 구간은 시작 날짜부터 기점까지 한 번 더 회귀한 선(검은 실선)으로, 창 길이 목록에 없는 아무 길이든 됩니다. <b>확대 팝업은 단순 확대가 아닙니다</b> - 끈 구간의 끝날이 팝업의 기점이 되어 회귀선과 팝업 맨 위의 요약이 그날에 서서 본 값으로 계산됩니다(2026년 5월까지 끌면 5월 입장의 기울기). 바깥 화면은 원래 기점의 결과 그대로입니다. 팝업 안에서 다시 끌면 새 구간의 끝이 기점입니다.</li>
+    <li><b>기점과 직접 구간</b>: 기점(날짜 또는 "며칠 전")을 옮기면 모든 회귀선이 그날까지의 종가로 다시 그어지고 요약 줄도 그날 기준이 됩니다 - "그때 이 규칙은 뭐라고 했나"를 보는 길입니다. 띠와 아래 차트의 선은 날마다 그날까지의 값이라 기점과 상관없이 같습니다. 직접 구간은 시작 날짜부터 기점까지 한 번 더 회귀한 선(검은 실선)으로, 창 길이 목록에 없는 아무 길이든 됩니다. <b>확대 팝업은 단순 확대가 아닙니다</b> - 끈 구간의 끝날이 팝업의 기점이 되어 회귀선과 팝업 맨 위의 요약이 그날에 서서 본 값으로 계산됩니다(2026년 5월까지 끌면 5월 입장의 기울기). 바깥 화면은 원래 기점의 결과 그대로입니다. 팝업 안에서 다시 끌면 새 구간의 끝이 기점입니다. 팝업 안의 "회귀시점 더하기"로 구간 안의 다른 날을 더하면 그날까지의 회귀선(고른 창마다, 짧은 점선)과 요약이 <b>이미 그린 구간 위에 더해집니다</b> - 1~5월을 열고 1월 15일을 더하면 1~5월 차트 그대로에 1월 15일 기준 20·60·120일 회귀선이 겹칩니다. 창이 구간 시작보다 앞서면 그만큼만 왼쪽을 넓힙니다. 꼬리표를 누르면 빠지고, 화면에서 새 팝업을 열면 비워집니다.</li>
     <li><b>띠</b>: "자동"이 합의 길이 규칙의 상태, "창"이 그날 합의 길이가 고른 창(옅을수록 짧은 창), 그 아래 "20일"·"60일" 같은 줄이 고른 창마다 그 창의 t 로 매긴 상태("창별 상태 띠"를 켰을 때만 - 처음에는 꺼져 있습니다. ±<span class="s_tin"></span> 에 들어가고 ±<span class="s_tout"></span> 안쪽에서 나옴), "탭5"가 탭 5 "추세 상태"의 6가지 상태입니다. 같은 날을 여러 창이 어떻게 부르는지 견줍니다.</li>
     <li><b>표</b>는 "표 기준"에서 고른 것(자동 규칙 또는 고른 창 하나)의 상태로 셉니다. 뜻은 탭 5 와 같습니다 - "진입 뒤 21일·63일"은 그 상태가 시작된 날 종가에서의 수익률(평균과 오른 비율), "진입 때 고점·저점 대비"는 신호가 켜졌을 때 이미 얼마나 움직인 뒤였는가입니다. 상태가 바뀌었을 때 무엇을 할지는 이 탭이 정해 주지 않습니다.</li>
     <li><b>계산은 화면에서</b> 합니다(창 길이가 임의라서). 코드의 <code>slope.py</code> 에 같은 계산이 있고, 파일을 만들 때 그 기준값을 넣어 두어 화면이 열릴 때 자기 계산과 견줍니다. 다르면 화면이 오류를 내고 만들기가 멈춥니다.</li>
@@ -384,7 +384,9 @@ td small,th small{color:var(--muted);font-weight:400}
   <div id="e_body"></div>
   <p class="sub" style="margin-top:10px">출처는 새 창으로 열립니다. "확인함"은 조사할 때 출처 페이지를 직접 열어 본 것이고, 그 밖은 검색 결과만 본 것입니다. 사건과 주가의 인과는 이 자료에 없습니다 - 날짜만 맞춰 둔 것입니다.</p>
 </div></div>
-<div id="z_park" hidden><div id="s_zctrl"><p class="hint" id="sz_now" style="margin:0 0 6px"></p><div class="ctrl" style="margin:0 0 4px"><label>창 <select id="sz_add" style="font-weight:650"></select></label><label>다른 길이 <input type="number" id="sz_wn" value="30" style="width:70px;font:inherit;font-size:14px;color:var(--ink);background:var(--surface);border:1px solid var(--axis);border-radius:8px;padding:5px 9px">거래일 <button id="sz_wadd">더하기</button></label></div><div class="chips" id="sz_chips" style="margin:0 0 8px"></div></div></div>
+<div id="z_park" hidden><div id="s_zctrl"><p class="hint" id="sz_now" style="margin:0 0 6px"></p><div class="ctrl" style="margin:0 0 4px"><label>창 <select id="sz_add" style="font-weight:650"></select></label><label>다른 길이 <input type="number" id="sz_wn" value="30" style="width:70px;font:inherit;font-size:14px;color:var(--ink);background:var(--surface);border:1px solid var(--axis);border-radius:8px;padding:5px 9px">거래일 <button id="sz_wadd">더하기</button></label></div><div class="chips" id="sz_chips" style="margin:0 0 4px"></div>
+<div class="ctrl" style="margin:0 0 4px"><label>회귀시점 더하기 <input type="date" id="sz_ad"> <button id="sz_aadd">더하기</button></label><label class="hint" style="margin:0">구간 끝은 늘 회귀시점입니다. 더한 날짜까지의 회귀선(고른 창마다, 짧은 점선)과 기울기가 이 화면 위에 더해집니다 - 차트는 다시 자르지 않고, 창이 구간 시작보다 앞서면 그만큼 왼쪽을 넓힙니다.</label></div>
+<div class="chips" id="sz_achips" style="margin:0 0 8px"></div></div></div>
 <div class="ov" id="zv"><div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="z_title">
   <div class="mhead"><h2 id="z_title">확대 보기</h2><button id="z_close">닫기</button></div>
   <div class="ctrl" style="margin:0 0 6px"><button id="z_back">← 이전 확대</button><button id="z_fwd">다음 확대 →</button><label id="z_step"></label></div>
@@ -1030,6 +1032,7 @@ function zoomDraw() {
   drawSet(gui('z_body'), set.items, zMake);
 }
 function openZoom(make, a, b, inside) {
+  if (!inside && make.reset) make.reset();  // 탭 6: 화면에서 새로 열면 팝업 안에서 더한 회귀시점을 비운다
   zHist = inside ? zHist.slice(0, zAt + 1) : []; zHist.push([a, b]); zAt = zHist.length - 1; zMake = make;
   gui('zv').classList.add('on');  // 먼저 보이게 한다. 숨겨진 동안에는 폭이 0이라 차트를 못 그린다
   zoomDraw();
@@ -1567,6 +1570,14 @@ const sPickers = [[gui('s_add'), gui('s_chips'), gui('s_wn'), gui('s_wadd')], [g
     pickAdd(sPick, String(w)); sChanged(); };
   return draw; });
 ['20', '60', '120'].forEach(w => pickAdd(sPick, w));  // 처음 값: 짧은 창·중간·긴 창 하나씩
+// 팝업 안에서 더한 회귀시점(칸 번호). 구간 끝은 늘 회귀시점이라 여기 넣지 않는다. 화면에서 새 팝업을 열면 비운다(make.reset).
+const sAnchors = new Set();
+const sAnchorChips = () => { gui('sz_achips').innerHTML = [...sAnchors].sort((p, q) => p - q).map(k =>
+  `<button data-k="${k}" title="누르면 뺍니다"><span>회귀시점 ${S.date[k]}</span><b aria-hidden="true">×</b></button>`).join('') || '<small>더한 회귀시점이 없습니다.</small>'; };
+gui('sz_achips').onclick = ev => { const b = ev.target.closest('button'); if (b) { sAnchors.delete(+b.dataset.k); sChanged(); } };
+gui('sz_aadd').onclick = () => { const d = gui('sz_ad').value; if (!d) return; const k = sDateIdx(d);
+  if (zHist.length) { const [a, b] = zHist[zAt]; if (k < a || k >= b) { gui('sz_ad').value = ''; return; } }  // 구간 안의 날만. 구간 끝은 이미 회귀시점
+  sAnchors.add(k); sChanged(); };
 // 팝업이 열려 있으면 팝업도 다시 그린다. 팝업은 열릴 때의 make(그때의 창 목록을 쥔 닫힘 함수)를 zMake 로 잡아 두므로,
 // 새 make 로 바꿔 주지 않으면 화면만 바뀌고 팝업은 옛 창 목록 그대로다(2026-11-27 사용자 보고).
 function sChanged() { slopeRender(); if (gui('zv').classList.contains('on') && gui('z_ctrl').contains(gui('s_zctrl'))) { zMake = slopeRender.make; zoomDraw(); } }
@@ -1612,18 +1623,24 @@ function slopeRender() {
   gui('s_now').innerHTML = sumAt(E);
   const tv = v => v == null ? '-' : v.toFixed(1), line = (name, arr, color, extra) => ({name, vals: [arr], color, ...extra});
   const make = (a, b, zoom) => {
-    const sl = arr => arr.slice(a, b + 1), dates = sl(S.date), nn = dates.length, abs = (i, j) => [a + i, a + j], big = zoom ? 80 : 0;
+    const big = zoom ? 80 : 0;
     // 회귀선(창마다)은 기점에서 끝낸다. 화면의 기점은 고른 날(E, 구간 밖이면 구간 마지막 날). **확대 팝업의 기점은 끈 구간의 끝날**이다 -
     // 팝업은 단순 확대가 아니라 "그날에 서서 보면"이다(2026-11-27 사용자: 2026년 5월까지 끌면 5월 입장의 기울기). 바깥 화면은 원래 기점 그대로다.
     // 그 창 안에서만 그리고 바깥은 비운다. 절편 = 창의 로그 종가 평균 - 기울기 x (w-1)/2
     const e = zoom ? b : (E >= a && E <= b ? E : b), FRe = zoom ? frOf(e) : FR;
-    if (zoom) gui('sz_now').innerHTML = sumAt(e) + (FRe || F != null ? `<br>${esc(rngText(e, FRe))}` : '');
-    const fitOf = wb => { const fit = Array(nn).fill(null); if (e - f0 < wb - 1) return fit;
+    // 팝업 안에서 더한 회귀시점: 구간 안의 날만. 가장 긴 창이 구간 시작보다 앞서면 그만큼 왼쪽을 넓힌다(차트를 다시 자르지는 않는다)
+    const anchors = zoom ? [...sAnchors].filter(k => k >= a && k < b).sort((p, q) => p - q) : [];
+    if (anchors.length && picked.length) a = Math.max(0, Math.min(a, anchors[0] - Math.max(...picked) + 1));
+    if (zoom) { gui('sz_ad').min = S.date[a]; gui('sz_ad').max = S.date[b]; sAnchorChips();
+      gui('sz_now').innerHTML = [sumAt(e) + (FRe || F != null ? `<br>${esc(rngText(e, FRe))}` : ''), ...anchors.map(k => sumAt(k))].join('<hr style="border:0;border-top:1px solid var(--grid);margin:4px 0">'); }
+    const fitOf = (wb, e) => { const fit = Array(nn).fill(null); if (e - f0 < wb - 1) return fit;
       const bb = D.res[wb].b[e - f0]; let m = 0; for (let k = 0; k < wb; k++) m += D.y[e - f0 - wb + 1 + k]; m /= wb; const ic = m - bb * (wb - 1) / 2;
       for (let k = 0; k < wb; k++) { const i = e - wb + 1 + k; if (i >= a) fit[i - a] = Math.exp(ic + bb * k); } return fit; };
+    const sl = arr => arr.slice(a, b + 1), dates = sl(S.date), nn = dates.length, abs = (i, j) => [a + i, a + j];
     const fitFR = Array(nn).fill(null); if (FRe) for (let k = 0; k < FRe.w; k++) { const i = F + k; if (i >= a && i <= b) fitFR[i - a] = Math.exp(FRe.ic + FRe.b * k); }
-    const vlines = !zoom && e === E && E < N - 1 ? [{i: E - a, label: '기점 ' + S.date[E], left: true}] : [];
+    const vlines = [...(!zoom && e === E && E < N - 1 ? [{i: E - a, label: '기점 ' + S.date[E], left: true}] : []), ...anchors.map(k => ({i: k - a, label: '회귀시점 ' + S.date[k], left: true}))];
     const col = w => sPick.get(String(w));
+    const anchorLines = anchors.flatMap(k => picked.map(w => line(`회귀선 ${w}일 @${S.date[k].slice(2)}`, fitOf(w, k), col(w), {dash: '2 2', fmt: pfmt(M), w: 1.6, noEnd: true})));
     const strips = [{name: '자동', vals: sl(stAuto), map: SSTATE}, {name: '창', vals: sl(pickAuto), map: SWIN},
                     ...(gui('s_strips').checked ? picked.map(w => ({name: w + '일', vals: sl(stWin[w]), map: SSTATE, lg: false})) : []), {name: '탭5', vals: sl(TRENDS.assets[key].state), map: TSTATE}];
     const per = (k, f) => picked.map(w => line(`${w}일 창`, sl(pad(D.res[w][k])).map(f), col(w), {fmt: k === 'b' ? pd2 : tv, w: 1.3, noEnd: true}));
@@ -1631,7 +1648,7 @@ function slopeRender() {
     return {sub: `${M.name} · ${dates[0]} ~ ${dates[nn - 1]} (${nn}거래일) · 이 팝업의 기점은 구간 끝 ${dates[nn - 1]} - 그날에 서서 본 회귀선과 값입니다(바깥 화면은 원래 기점 그대로) · 다시 끌면 그 구간의 끝이 기점이 됩니다 · Esc 나 바깥을 누르면 닫힙니다`, ctrl: zoom ? gui('s_zctrl') : null, items: [
       {title: `${M.name} 종가 (로그 눈금) · 점선: ${S.date[e]} 을 기점으로 한 회귀선(고른 창마다)${FRe ? ' · 검은 실선: 직접 구간' : ''} · 띠: 자동 규칙의 상태 / 자동이 고른 창 / ${gui('s_strips').checked ? '고른 창마다의 상태 / ' : ''}탭 5 의 상태`, abs,
        cfg: {dates, h: 260 + big, log: true, fmt: paxis(M), aria: M.name + ' 종가와 회귀선', strips, vlines,
-             lines: [line('종가', sl(Sx.close), '--ink', {fmt: pfmt(M), w: 1.6}), ...picked.map(w => line(`회귀선 ${w}일`, fitOf(w), col(w), {dash: '6 3', fmt: pfmt(M), w: 1.8, noEnd: true})),
+             lines: [line('종가', sl(Sx.close), '--ink', {fmt: pfmt(M), w: 1.6}), ...picked.map(w => line(`회귀선 ${w}일`, fitOf(w, e), col(w), {dash: '6 3', fmt: pfmt(M), w: 1.8, noEnd: true})), ...anchorLines,
                      ...(FRe ? [line(`직접 구간 ${FRe.w}일`, fitFR, '--ink', {fmt: pfmt(M), w: 2.2, noEnd: true, op: .55})] : [])]}},
       {title: `기울기 - 하루 % (고른 창마다. 검은 점선은 자동 - 합의 길이가 그날 고른 창의 값)`, abs,
        cfg: {dates, h: 180 + big, zero: true, fmt: v => v.toFixed(1) + '%', aria: M.name + ' 회귀 기울기', vlines, lines: [...per('b', sDay), autoLine('b', sDay)]}},
@@ -1640,6 +1657,7 @@ function slopeRender() {
              {name: `±${SP.t_in}`, vals: [tConst(nn, SP.t_in), tConst(nn, -SP.t_in)], color: '--ink2', dash: '5 3', fmt: tv, noEnd: true, quiet: true},
              {name: `±${SP.t_out}`, vals: [tConst(nn, SP.t_out), tConst(nn, -SP.t_out)], color: '--muted', dash: '2 3', fmt: tv, noEnd: true, quiet: true}]}}]};
   };
+  make.reset = () => sAnchors.clear();
   drawSet(gui('s_charts'), make(a0, b0).items, make); slopeRender.make = make;  // 팝업이 열린 채 창을 바꿀 때 sChanged 가 쓴다
   // 이 기간의 상태 구간(표 기준. 기간 첫날에 걸친 구간은 진짜 시작일부터)
   const C = Sx.close, rows = []; let i = a0; while (i > first && ST[i - 1] === ST[a0]) i--;
