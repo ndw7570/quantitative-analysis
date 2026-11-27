@@ -6,6 +6,7 @@ from pathlib import Path
 from assets import ASSETS
 from common import hike_data, rate_data, year_data
 from events import load_events
+from trend import trend_data
 
 HERE = Path(__file__).parent
 load = lambda name: json.loads((HERE / "data" / name).read_text(encoding="utf-8"))
@@ -15,7 +16,7 @@ dates = [d["R"]["series"]["date"] for d in data.values()]
 assert all(x == dates[0] for x in dates), "대상별 날짜 목록이 다르다"
 
 html = (HERE / "template.html").read_text(encoding="utf-8")
-assert all(html.count(s) == 1 for s in ("__DATA__", "__YIX__", "__RATES__", "__HIKE__", "__EVENTS__"))
+assert all(html.count(s) == 1 for s in ("__DATA__", "__YIX__", "__RATES__", "__HIKE__", "__EVENTS__", "__TREND__"))
 # 탭 3 은 지수마다 자기 시장의 달력 그대로 쓴다. 한국 달력에 얹은 값(result)으로는 미국의 한 해를 날짜대로 그릴 수 없다.
 html = html.replace("__YIX__", json.dumps(year_data(), ensure_ascii=False, separators=(",", ":")))
 # 탭 4 의 금리 설명은 BIS 가 쓴 글이다. 그 안에 "</script>" 가 있으면 페이지가 거기서 잘리므로 "</" 를 풀어 쓴다(JSON 으로는 같은 글자다).
@@ -24,6 +25,8 @@ html = html.replace("__RATES__", json.dumps(rates, ensure_ascii=False, separator
 # 탭 4 의 인상기 분석(정책금리에서 계산)과 탭 1 툴팁의 날짜별 이슈(events/events.csv - 손으로 적은 글이 섞여 있어 "</" 를 같이 푼다)
 html = html.replace("__HIKE__", json.dumps(hike_data(rates), ensure_ascii=False, separators=(",", ":")))
 html = html.replace("__EVENTS__", json.dumps(load_events(), ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/"))
+# 탭 5 의 추세 상태(result_*.json 의 종가에서 규칙으로 매긴 것. 2초 안쪽이라 따로 단계를 두지 않고 여기서 계산한다)
+html = html.replace("__TREND__", json.dumps(trend_data(), ensure_ascii=False, separators=(",", ":")))
 out = Path(sys.argv[1])
 out.parent.mkdir(parents=True, exist_ok=True)
 out.write_text(html.replace("__DATA__", json.dumps(data, ensure_ascii=False, separators=(",", ":"))), encoding="utf-8")

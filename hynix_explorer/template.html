@@ -12,6 +12,7 @@
   --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#6250d6;
   --up:#d03b3b; --down:#2a78d6; --flat:#c3c2b7;
   --r0:#9ec5f4; --r1:#2a78d6; --r2:#104281;
+  --t_surge:#8f1f1f; --t_chop:#eda100; --t_crash:#104281;
   --crit:#d03b3b; --note:#f0efec; --sel:rgba(11,11,11,.10); --btn:#0b0b0b; --btnink:#fcfcfb;
 }
 @media (prefers-color-scheme:dark){
@@ -22,6 +23,7 @@
     --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9;
     --up:#e66767; --down:#3987e5; --flat:#52514e;
     --r0:#184f95; --r1:#3987e5; --r2:#b7d3f6;
+    --t_surge:#ffb0b0; --t_chop:#c98500; --t_crash:#b7d3f6;
     --crit:#e66767; --note:#262624; --sel:rgba(255,255,255,.14); --btn:#f0efec; --btnink:#1a1a19;
   }
 }
@@ -112,6 +114,7 @@ td small,th small{color:var(--muted);font-weight:400}
   <button role="tab" data-tab="sig">극단값 신호표</button>
   <button role="tab" data-tab="year">여러 해 겹쳐 보기</button>
   <button role="tab" data-tab="rate">주요국 정책금리</button>
+  <button role="tab" data-tab="trend">추세 상태</button>
 </div>
 
 <div id="tab_explore">
@@ -289,6 +292,41 @@ td small,th small{color:var(--muted);font-weight:400}
   <details><summary>나라마다 무엇을 정책금리로 치는가 (BIS 원문, 영어)</summary><div class="tw"><table id="r_notes"></table></div></details>
 </div>
 </div>
+
+<div id="tab_trend" hidden>
+<div class="card">
+  <h2>추세 상태 - 지금이 상승·보합·하락 어느 쪽이고, 급한가 (예측이 아닙니다)</h2>
+  <p class="sub">종가 하나로 날마다 상태 6가지를 매깁니다: <b>급상승 · 상승 · 보합 · 요동 · 하락 · 급하락</b>. 방향은 <span class="t_dn"></span>거래일 수익률, 세기는 <span class="t_vn"></span>거래일 변동성으로 잽니다. 그날까지의 종가만 쓰므로 "그날 알 수 있었던 상태"이고, 꼭지와 바닥보다 늦습니다. <b>얼마나 늦었고 그 뒤에 무엇이 왔는지</b>를 아래 표가 셉니다.</p>
+  <div class="ctrl">
+    <label>대상 <select id="t_asset" style="font-weight:650"></select></label>
+    <label>기간 <select id="t_span"></select></label>
+    <label id="t_cnt"></label>
+  </div>
+  <p class="hint" id="t_now"></p>
+  <div id="t_charts"></div>
+  <details id="t_runs_w" open style="margin-top:12px"><summary>이 기간의 상태 구간 (누르면 접거나 펼칩니다)</summary>
+    <div class="tw" style="margin-top:8px"><table id="t_runs"></table></div>
+    <p class="sub" style="margin-top:6px">구간 수익률은 구간 직전 거래일 종가에서 구간 마지막 날 종가까지입니다. "진입 때 고점 대비"는 구간 첫날 종가가 지난 1년(<span class="t_hn"></span>거래일) 최고 종가보다 몇 % 아래인지, 상승 쪽 상태는 최저 종가보다 몇 % 위인지입니다 - 신호가 켜졌을 때 이미 얼마나 움직인 뒤였는가입니다.</p>
+  </details>
+  <div class="ctitle" style="margin-top:14px">전체 기간 - 상태마다 그 뒤에 무엇이 왔나 (구간 첫날 기준, <span id="t_srange"></span>)</div>
+  <p class="hint" id="t_agree"></p>
+  <div class="tw"><table id="t_stats"></table></div>
+</div>
+<div class="card">
+  <h2>읽는 법과 한계</h2>
+  <ul>
+    <li><b>규칙</b>: 방향은 <span class="t_dn"></span>거래일(약 3달) 수익률이 +<span class="t_in"></span>% 를 넘으면 상승, -<span class="t_in"></span>% 아래면 하락입니다. 한 번 들어가면 ±<span class="t_out"></span>% 안으로 되돌아와야 보합으로 나옵니다(문턱 하나로 하면 그 언저리에서 날마다 상태가 바뀝니다). 세기는 <span class="t_vn"></span>거래일 변동성(일 수익률의 표준편차)이 지난 1년 동안의 그 변동성 중위값의 <span class="t_vin"></span>배를 넘으면 "급"이고, <span class="t_vout"></span>배 아래로 내려와야 풀립니다. 상승+급 = 급상승, 하락+급 = 급하락, 보합+급 = 요동(방향 없이 크게 흔들리는 때 - 바닥을 다지는 때가 많습니다).</li>
+    <li><b>문턱값은 처음 정한 값이고 자료에 맞춰 고르지 않았습니다.</b> 맞추면 과거에만 맞는 값이 됩니다. 바꾸려면 코드의 <code>trend.py</code> 맨 위 숫자를 고치고 다시 만듭니다.</li>
+    <li><b>세 띠</b>: 첫 차트 아래 "상태"가 이 탭의 규칙, "이평"은 탭 1 의 추세(20·60일 이동평균의 배열), "HMM"은 탭 1 의 변동성 국면(숨은 상태 모형, 전체 기간을 보고 사후에 매긴 것)입니다. 같은 날을 셋이 어떻게 다르게 부르는지 견주는 자리입니다. 이 탭의 규칙만 "그날까지의 자료"로 정해집니다.</li>
+    <li><b>표 읽기</b>: "진입 뒤 21일"은 그 상태가 시작된 날 종가에서 21거래일 뒤 종가까지의 수익률(평균, 그리고 오른 비율)입니다. 하락·급하락 줄에서 이 값이 양수면 <b>신호가 켜진 뒤에 파는 것은 늦다</b>는 뜻입니다 - 그때는 이미 1년 고점에서 "진입 때 고점 대비"만큼 내려와 있습니다. "63일 안 더 간 폭"은 신호 뒤 63거래일 안의 최저(하락 쪽)·최고(상승 쪽)까지 얼마나 더 갔는가의 중위값입니다 - 신호 뒤에 남아 있던 움직임입니다.</li>
+    <li><b>구간 수가 많고 짧은 구간이 섞여 있습니다.</b> 보합 ↔ 상승을 며칠 사이에 오가는 구간은 신호로 쓰기 어렵습니다. 지속 일수 중위값이 그 정도를 말합니다.</li>
+    <li><b>미국 대상은 한국 달력에 얹은 종가</b>라 미국이 쉬고 한국이 연 날은 전날 값이 이어져 변동성이 조금 낮게 잽니다(탭 1 과 같은 자료). 오늘 종가는 확정값이 아닐 수 있습니다.</li>
+    <li><b>이 표는 과거 통계이지 앞으로의 확률이 아닙니다.</b> 사례 수(구간 수)가 수십 개이고 1997년 이후 한 시장의 역사 하나입니다. 상태가 바뀌었을 때 무엇을 할지는 이 탭이 정해 주지 않습니다 - 상태별 비중 규칙은 따로 정해야 합니다.</li>
+    <li><b>확대 팝업</b>: 차트 위에서 마우스를 누른 채 끌었다 놓으면 그 기간만 크게 다시 그립니다(탭 3·4 와 같습니다).</li>
+    <li><b>주소</b>: <code>#trend</code>, <code>#trend-kospi</code>, <code>#trend-hynix-y10</code>(최근 10년).</li>
+  </ul>
+</div>
+</div>
 </main>
 
 <div class="ov" id="ev"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="e_title">
@@ -312,6 +350,7 @@ const ALL = __DATA__, KEYS = Object.keys(ALL);   // {대상: {R: 탭 1 자료, G
 const RATES = __RATES__;   // 탭 4 자료: {start, end, areas: {나라 부호: {name, group, note, last: 자료 마지막 날, steps: [[바뀐 날, 값 %]], cpi: {from: 첫 달, v: [달마다 물가 상승률 %]}}}} (common.py 의 rate_data)
 const HIKE = __HIKE__;   // 탭 4 인상기 분석: {min, from, after, drop, window, areas: {US|KR: {name, ix, ix_end, cycles: [...], board: {s1..s4, count}}}} (common.py 의 hike_data)
 const EVENTS = __EVENTS__;   // 날짜별 사건 [{date, country, asset(종목 키. 빈칸이면 나라 전체), category, title, summary, source, checked}] (events/events.csv)
+const TRENDS = __TREND__;   // 탭 5 추세 상태: {params, states: 코드 6개, names, assets: {대상: {state: 날마다 0~5|null, r: 60일 수익률, vol, ref, stats, agree}}} (trend.py)
 const CATS = {rate: '금리', earnings: '실적', shareholder: '주주환원', business: '투자·계약·제품', policy: '정책·규제', incident: '사고·소송', people: '경영진', other: '기타'};
 // 탭 1 툴팁의 이슈: 이슈의 날짜를 화면 달력(모든 대상이 같은 날짜 목록)의 칸 번호로 옮긴다. 장이 쉰 날의 이슈는 다음 거래일 칸에 붙는다.
 const EV_AT = {}; { const dts = ALL[KEYS[0]].R.series.date; let j = 0;
@@ -1313,16 +1352,76 @@ gui('r_notes').innerHTML = '<tr><th>나라</th><th style="text-align:left">BIS �
 // 숨겨진 채로 한 번 그린다(탭 3 과 같은 이유 - 화면 검사가 이 탭의 오류를 잡게)
 rateRender();
 
+// ---------- 탭 5: 추세 상태 ----------
+// 띠의 색: 급상승·급하락은 상승·하락 색의 짙은 단계, 요동은 호박색. 색만으로 가르지 않고 범례와 아래 표가 글자로 같이 말한다.
+const TSTATE = {0: ['급상승', '--t_surge'], 1: ['상승', '--up'], 2: ['보합', '--flat'], 3: ['요동', '--t_chop'], 4: ['하락', '--down'], 5: ['급하락', '--t_crash']};
+const TP = TRENDS.params, tName = s => TRENDS.names[TRENDS.states[s]];
+const tUpSide = s => s <= 1;  // 상승·급상승은 저점 대비, 나머지는 고점 대비로 "진입 때 얼마나 움직인 뒤였나"를 잰다
+gui('t_asset').innerHTML = assetOpts; gui('t_asset').value = 'kospi';
+gui('t_span').innerHTML = [[0, '전체'], [30, '최근 30년'], [20, '최근 20년'], [10, '최근 10년'], [5, '최근 5년'], [3, '최근 3년'], [1, '최근 1년']].map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
+gui('t_span').value = '3';
+for (const [cls, v] of [['t_dn', TP.dir_n], ['t_vn', TP.vol_n], ['t_in', TP.dir_in], ['t_out', TP.dir_out], ['t_vin', TP.vol_in], ['t_vout', TP.vol_out], ['t_hn', TP.hi_n]])
+  document.querySelectorAll('.' + cls).forEach(e => e.textContent = v);
+const tConst = (n, v) => Array(n).fill(v);
+function trendRender() {
+  const key = gui('t_asset').value, T = TRENDS.assets[key], M = ALL[key].R.meta, Sx = ALL[key].R.series, span = +gui('t_span').value;
+  const first = T.state.findIndex(s => s != null);  // 상태가 있는 첫날(상장 뒤 변동성 기준 1년이 찬 날)
+  const last = S.date[N - 1], cut = (+last.slice(0, 4) - span) + last.slice(4);
+  const a0 = span ? Math.max(first, S.date.findIndex(d => d >= cut)) : first, b0 = N - 1;
+  gui('t_cnt').textContent = `${S.date[a0]} ~ ${last} (${(b0 - a0 + 1).toLocaleString('ko-KR')}거래일)`;
+  // 오늘의 자리: 지금 상태가 며칠째인지, 두 축의 값이 문턱에서 얼마나 떨어져 있는지
+  { let i = N - 1; while (i > 0 && T.state[i - 1] === T.state[N - 1]) i--;
+    const s = T.state[N - 1];
+    gui('t_now').innerHTML = s == null ? `${esc(M.name)}: 마지막 날의 상태를 매길 자료가 모자랍니다.` :
+      `<b>${esc(M.name)} ${last}: ${tName(s)}</b> - ${S.date[i]} 부터 ${N - i}거래일째 · ${TP.dir_n}거래일 수익률 ${pc(T.r[N - 1])} (문턱 ±${TP.dir_in}%, 나오는 문턱 ±${TP.dir_out}%) · ${TP.vol_n}거래일 변동성 ${T.vol[N - 1].toFixed(2)}% (급 문턱 ${(T.ref[N - 1] * TP.vol_in).toFixed(2)}%)`; }
+  const make = (a, b, zoom) => {
+    const sl = arr => arr.slice(a, b + 1), dates = sl(S.date), n = dates.length, abs = (i, j) => [a + i, a + j], big = zoom ? 80 : 0;
+    const v2 = v => v.toFixed(2) + '%';
+    return {sub: `${M.name} · ${dates[0]} ~ ${dates[n - 1]} (${n}거래일) · 차트 위를 다시 끌면 더 좁혀집니다 · Esc 나 바깥을 누르면 닫힙니다`, items: [
+      {title: `${M.name} 종가 (로그 눈금) · 띠 셋: 상태(이 탭의 규칙), 이평(탭 1 의 추세), HMM(탭 1 의 변동성 국면)`, abs, cfg: {dates, h: 260 + big, log: true, fmt: paxis(M), aria: M.name + ' 종가와 추세 상태',
+        strips: [{name: '상태', vals: sl(T.state), map: TSTATE}, {name: '이평', vals: sl(Sx.trend), map: TREND}, {name: 'HMM', vals: sl(Sx.regime), map: REG}],
+        lines: [{name: '종가', vals: [sl(Sx.close)], color: '--ink', fmt: pfmt(M), w: 1.6}]}},
+      {title: `방향 - ${TP.dir_n}거래일 수익률 (%) · 바깥 점선을 넘으면 상승·하락, 안쪽 점선 안으로 돌아오면 보합`, abs, cfg: {dates, h: 160 + big, zero: true, fmt: pc, aria: M.name + ' 60거래일 수익률',
+        lines: [{name: `${TP.dir_n}거래일 수익률`, vals: [sl(T.r)], color: '--ink', fmt: pc, w: 1.4},
+                {name: `들어가는 문턱 ±${TP.dir_in}%`, vals: [tConst(n, TP.dir_in), tConst(n, -TP.dir_in)], color: '--ink2', dash: '5 3', fmt: pc, noEnd: true},
+                {name: `나오는 문턱 ±${TP.dir_out}%`, vals: [tConst(n, TP.dir_out), tConst(n, -TP.dir_out)], color: '--muted', dash: '2 3', fmt: pc, noEnd: true}]}},
+      {title: `세기 - ${TP.vol_n}거래일 변동성 (일 수익률의 표준편차, %) · 점선(지난 1년 중위값의 ${TP.vol_in}배)을 넘으면 "급"`, abs, cfg: {dates, h: 160 + big, zero: true, fmt: v => v.toFixed(1), aria: M.name + ' 20거래일 변동성',
+        lines: [{name: `${TP.vol_n}거래일 변동성`, vals: [sl(T.vol)], color: '--ink', fmt: v2, w: 1.4},
+                {name: `급 문턱 (중위값 × ${TP.vol_in})`, vals: [sl(T.ref).map(v => v == null ? null : v * TP.vol_in)], color: '--ink2', dash: '5 3', fmt: v2, noEnd: true},
+                {name: `풀리는 문턱 (× ${TP.vol_out})`, vals: [sl(T.ref).map(v => v == null ? null : v * TP.vol_out)], color: '--muted', dash: '2 3', fmt: v2, noEnd: true}]}}]};
+  };
+  drawSet(gui('t_charts'), make(a0, b0).items, make);
+  // 이 기간의 상태 구간. 기간의 첫날에 걸친 구간은 그 구간의 진짜 시작일부터 센다(기간을 바꿔도 같은 구간은 같은 줄).
+  const rows = []; let i = a0; while (i > first && T.state[i - 1] === T.state[a0]) i--;
+  const C = Sx.close;
+  for (; i <= b0;) { const s = T.state[i]; let j = i; while (j < N - 1 && T.state[j + 1] === s) j++;
+    if (s != null) { let ext = C[i]; for (let k = Math.max(0, i - TP.hi_n); k <= i; k++) if (C[k] != null) ext = tUpSide(s) ? Math.min(ext, C[k]) : Math.max(ext, C[k]);
+      const ret = i > 0 && C[i - 1] ? C[j] / C[i - 1] * 100 - 100 : null;
+      rows.push(`<tr><td><i class="box" style="display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:5px;background:var(${TSTATE[s][1]})"></i>${tName(s)}</td><td>${S.date[i]}</td><td>${j === N - 1 ? '진행 중' : S.date[j]}</td><td>${j - i + 1}</td><td>${ret == null ? '-' : pc(ret)}</td><td>${pc(C[i] / ext * 100 - 100)}</td></tr>`); }
+    i = j + 1; }
+  gui('t_runs').innerHTML = `<tr><th>상태</th><th>시작</th><th>끝</th><th>거래일</th><th>구간 수익률</th><th>진입 때 ${'고점·저점'} 대비</th></tr>` + rows.join('');
+  gui('t_runs_w').open = rows.length <= 60;  // 30년 전체는 수백 줄이라 접어 둔다
+  // 전체 기간 통계
+  const st = T.stats, f = (v, d = 1) => v == null ? '-' : (v > 0 ? '+' : '') + v.toFixed(d) + '%', fp = v => v == null ? '-' : v.toFixed(0) + '%';
+  gui('t_srange').textContent = `${S.date[first]} ~ ${last}`;
+  gui('t_agree').textContent = `이 규칙의 방향이 탭 1 의 이동평균 추세와 같은 날 ${fp(T.agree.ma)} · HMM 이 고변동이라 한 날 가운데 이 규칙이 "급"이라 한 날 ${fp(T.agree.hv)}`;
+  gui('t_stats').innerHTML = `<tr><th>상태</th><th>일수 (비율)</th><th>구간 수</th><th>지속 중위(일)</th><th>진입 뒤 ${TP.fwd[0]}일 평균 · 오른 비율</th><th>진입 뒤 ${TP.fwd[1]}일 평균 · 오른 비율</th><th>진입 때 고점·저점 대비 (중위)</th><th>${TP.fwd[1]}일 안 더 간 폭 (중위)</th></tr>` +
+    TRENDS.states.map((code, s) => { const x = st[code], w = k => `${f(x.fwd[k].mean)} · ${fp(x.fwd[k].pos)}`;
+      return `<tr><td><i style="display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:5px;background:var(${TSTATE[s][1]})"></i>${tName(s)}</td><td>${x.days.toLocaleString('ko-KR')} (${fp(x.share)})</td><td>${x.runs}</td><td>${x.med_len == null ? '-' : x.med_len}</td><td>${w(String(TP.fwd[0]))}</td><td>${w(String(TP.fwd[1]))}</td><td>${f(x.late.med)}${tUpSide(s) ? ' (저점)' : ' (고점)'}</td><td>${f(x.more.med)}</td></tr>`; }).join('');
+}
+gui('t_asset').onchange = gui('t_span').onchange = trendRender;
+trendRender();  // 숨겨진 채로 한 번 그린다(탭 3·4 와 같은 이유 - 화면 검사가 이 탭의 오류를 잡게)
+
 const tabBtns = document.querySelectorAll('.tabs button');
 function setTab(t) {
   tabBtns.forEach(b => { const on = b.dataset.tab === t; b.classList.toggle('on', on); b.setAttribute('aria-selected', on);
     gui('tab_' + b.dataset.tab).hidden = !on; });
   splitBtn.hidden = t !== 'explore';
   // 숨겨진 동안에는 폭이 0이라 차트를 못 그린다. 보이게 된 쪽을 그때 다시 그린다.
-  if (t === 'sig') sigRender(); else if (t === 'year') yearRender(); else if (t === 'rate') rateRender(); else window.dispatchEvent(new Event('resize'));
+  if (t === 'sig') sigRender(); else if (t === 'year') yearRender(); else if (t === 'rate') rateRender(); else if (t === 'trend') trendRender(); else window.dispatchEvent(new Event('resize'));
 }
 tabBtns.forEach(b => b.onclick = () => setTab(b.dataset.tab));
-window.addEventListener('resize', () => { if (!gui('tab_sig').hidden) sigRender(); if (!gui('tab_year').hidden) yearRender(); if (!gui('tab_rate').hidden) rateRender();
+window.addEventListener('resize', () => { if (!gui('tab_sig').hidden) sigRender(); if (!gui('tab_year').hidden) yearRender(); if (!gui('tab_rate').hidden) rateRender(); if (!gui('tab_trend').hidden) trendRender();
   if (zHist.length && gui('zv').classList.contains('on')) zoomDraw(); });
 tabBtns[0].classList.add('on');
 { // 점검·공유용: #sig, #sig-2026-06-22, #sig-2026-06-22-f12, #sig-2026-06-22-f12-kospi 처럼 탭·기준일·지표·대상을 주소로 연다
@@ -1352,6 +1451,11 @@ tabBtns[0].classList.add('on');
     if (rm[5]) gui('r_mode').value = rm[5] === 'o' ? 'year' : rm[5];
     if (rm[6] && [...gui('r_from').options].some(o => o.value === rm[6])) gui('r_from').value = rm[6];
     setTab('rate'); }
+  // #trend, #trend-kospi, #trend-hynix-y10(최근 10년): 탭 5 의 대상과 기간
+  const tm = location.hash.match(/^#trend(?:-([a-z]+)(?![a-z]))?(?:-y(\d+))?/);
+  if (tm) { if (tm[1] && ALL[tm[1]]) gui('t_asset').value = tm[1];
+    if (tm[2] && [...gui('t_span').options].some(o => o.value === tm[2])) gui('t_span').value = tm[2];
+    setTab('trend'); }
   // #assets-samsung-kospi: 탭 1의 왼쪽·오른쪽 창 대상을 주소로 정한다
   const am = location.hash.match(/assets-([a-z]+)-([a-z]+)/);
   if (am && ALL[am[1]] && ALL[am[2]]) { panes.L.setAsset(am[1]); panes.R.setAsset(am[2]); }
@@ -1372,8 +1476,8 @@ if (location.hash.startsWith('#test')) setTimeout(() => {
 /* 탭 3·4 의 확대 팝업도 같은 식으로 본다: 주소 끝에 -zoom(첫 차트), -zoom2(둘째 차트)를 붙이면 그 차트의 45% ~ 75% 자리를 끈다.
    -zoomzoom 은 열린 팝업의 첫 차트를 한 번 더 끈다(팝업 안에서 다시 좁히는 길). 끝에 back 을 더 붙이면 "이전 확대"까지 누른다.
    예: #year-2018-rus-zoom, #rate-us-kr-y30-split-zoom2, #rate-us-kr-zoomzoomback */
-{ const zm = location.hash.match(/^#(year|rate).*?-zoom(zoom)?(\d?)(back)?$/);
-  if (zm) setTimeout(() => { dragSvg(gui(zm[1] === 'year' ? 'y_charts' : 'r_charts').querySelectorAll('.chart svg')[(+zm[3] || 1) - 1], 0.45, 0.75);
+{ const zm = location.hash.match(/^#(year|rate|trend).*?-zoom(zoom)?(\d?)(back)?$/);
+  if (zm) setTimeout(() => { dragSvg(gui({year: 'y_charts', rate: 'r_charts', trend: 't_charts'}[zm[1]]).querySelectorAll('.chart svg')[(+zm[3] || 1) - 1], 0.45, 0.75);
     if (zm[2]) dragSvg(gui('z_body').querySelector('.chart svg'), 0.3, 0.6);
     if (zm[4]) gui('z_back').click(); }, 100); }
 </script>
