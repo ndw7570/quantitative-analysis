@@ -40,6 +40,15 @@ class TempOut(unittest.TestCase):
         self.assertNotEqual(new, out)
         self.assertEqual(new.suffix, ".html")  # 아니면 브라우저가 페이지로 읽지 않는다
 
+    def test_v2_name_matches_what_build_writes(self):
+        # build.py 는 out 옆에 <stem>-v2.html 을 쓰고, update.py 는 같은 이름을 옮긴다. 둘이 어긋나면 v2 가 임시 자리에 남는다
+        out = Path("a") / "index.html"
+        self.assertEqual(update.v2_of(out), Path("a") / "index-v2.html")
+        self.assertEqual(update.v2_of(update.temp_out(out)).suffix, ".html")
+        build = (HERE / "build.py").read_text(encoding="utf-8")
+        self.assertIn('out.with_name(out.stem + "-v2" + out.suffix)', build)
+        self.assertIn("classList.contains('v2')", (HERE / "template.html").read_text(encoding="utf-8"))
+
 
 class LastDay(unittest.TestCase):
     def test_reads_the_last_line_and_ignores_the_byte_order_mark(self):

@@ -81,6 +81,11 @@ td.wrap{white-space:normal}
 .note{background:var(--note);border-radius:8px;padding:10px 14px;font-size:14px;margin:10px 0 0}
 ul{margin:6px 0;padding-left:20px}
 details summary{cursor:pointer;color:var(--ink2);font-size:14px}
+/* v2(안내 접기 판): 카드 안의 설명 글을 모은 접기. 글보다 차트가 먼저 보이게 작고 옅게 */
+.v2 details.v2d{margin:2px 0 8px}
+.v2 details.v2d>summary{font-size:13px;color:var(--muted)}
+.v2 details.v2d[open]>summary{margin-bottom:6px}
+.v2 .card>h2{font-size:17px;margin-bottom:4px}
 .ov{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-start;justify-content:center;padding:32px 12px;overflow:auto;z-index:20}
 .ov.on{display:flex}
 .modal{background:var(--surface);border-radius:12px;border:1px solid var(--border);max-width:920px;width:100%;padding:20px}
@@ -400,6 +405,16 @@ td small,th small{color:var(--muted);font-weight:400}
 </div></div>
 
 <script>
+// v2(안내 접기 판): build.py 가 body 에 v2 를 붙여 index-v2.html 로 따로 낸다. 자료·탭·조작은 같다.
+// 카드 안의 설명 글 - id 가 없는 p.sub·p.hint(값이 든 줄은 id 가 있다), ul, id 없는 details - 를 접힌 details 하나로 모은다. 차트·표·조작은 그대로.
+// 차트보다 글이 먼저 보여 지저분하다는 2026-11-27 지적. 템플릿을 둘로 복사하면 고칠 때마다 두 번 고쳐야 해서 한 템플릿에 표시 하나로 가른다.
+if (document.body.classList.contains('v2')) document.querySelectorAll('.card').forEach(card => {
+  const got = [...card.children].filter(el => (el.matches('p.sub, p.hint') && !el.id) || el.matches('ul') || (el.matches('details') && !el.id));
+  if (!got.length) return;
+  const d = document.createElement('details'); d.className = 'v2d';
+  const sm = document.createElement('summary'); sm.textContent = '설명 (누르면 펼칩니다)'; d.appendChild(sm);
+  card.insertBefore(d, got[0]); got.forEach(el => d.appendChild(el));
+});
 const ALL = __DATA__, KEYS = Object.keys(ALL);   // {대상: {R: 탭 1 자료, G: 탭 2 자료}}
 const RATES = __RATES__;   // 탭 4 자료: {start, end, areas: {나라 부호: {name, group, note, last: 자료 마지막 날, steps: [[바뀐 날, 값 %]], cpi: {from: 첫 달, v: [달마다 물가 상승률 %]}}}} (common.py 의 rate_data)
 const HIKE = __HIKE__;   // 탭 4 인상기 분석: {min, from, after, drop, window, areas: {US|KR: {name, ix, ix_end, cycles: [...], board: {s1..s4, count}}}} (common.py 의 hike_data)

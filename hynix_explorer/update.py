@@ -38,6 +38,11 @@ def default_out(here=HERE):
     return here.parent / "out" / "index.html"
 
 
+def v2_of(path):
+    """안내 접기 판의 이름. build.py 가 같은 규칙으로 만든다(index.html -> index-v2.html)."""
+    return path.with_name(path.stem + "-v2" + path.suffix)
+
+
 def temp_out(out):
     """검사를 통과하기 전까지 새 판을 두는 자리. 같은 폴더여야 마지막 옮기기가 한 번에 끝난다.
 
@@ -150,7 +155,9 @@ def main():
     new = temp_out(out)
     step("build", str(new))
     step("check", "html", str(new), log="check_html")
+    step("check", "html", str(v2_of(new)), log="check_html_v2")  # 접기 코드가 화면을 깨뜨리지 않았는지 v2 도 그려 본다
     os.replace(new, out)
+    os.replace(v2_of(new), v2_of(out))
     summary()
     print(f"\n자료 기준일 {px_end} · 전체 {time.time() - t0:.0f}초 · {out.stat().st_size / 1e6:.1f}MB")
     print(out.as_uri())

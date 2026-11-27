@@ -32,5 +32,11 @@ html = html.replace("__TREND__", json.dumps(trend_data(), ensure_ascii=False, se
 html = html.replace("__SLOPE__", json.dumps(slope_data(), ensure_ascii=False, separators=(",", ":"), allow_nan=False))
 out = Path(sys.argv[1])
 out.parent.mkdir(parents=True, exist_ok=True)
-out.write_text(html.replace("__DATA__", json.dumps(data, ensure_ascii=False, separators=(",", ":"))), encoding="utf-8")
+html = html.replace("__DATA__", json.dumps(data, ensure_ascii=False, separators=(",", ":")))
+out.write_text(html, encoding="utf-8")
 print(out, out.stat().st_size, "bytes")
+# v2(안내 접기 판): 같은 내용에 body 의 표시 하나만 다르다. 화면 코드가 그 표시를 보고 설명 글을 접는다(template.html 맨 위).
+assert html.count("<body>") == 1
+v2 = out.with_name(out.stem + "-v2" + out.suffix)
+v2.write_text(html.replace("<body>", '<body class="v2">', 1), encoding="utf-8")
+print(v2, v2.stat().st_size, "bytes")
