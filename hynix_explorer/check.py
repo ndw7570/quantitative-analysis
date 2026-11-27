@@ -18,6 +18,7 @@ import pandas as pd
 from assets import ASSETS, KR_BENCH, RATES, YEAR_IX
 from common import D, hike_data, prices, rate_data, year_close, year_data
 from events import auto_rows_all, bad_reason, load_dart, load_events, load_sec
+from slope import slope_data
 from trend import trend_data
 
 FLOW_FROM = pd.Timestamp("2005-01-03")  # 네이버 증권의 투자자별 수급이 시작되는 날
@@ -29,7 +30,7 @@ BROWSERS = [r"C:\Program Files\Google\Chrome\Application\chrome.exe",
             r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"]
 # 처음 열었을 때 그려지는 차트 수. 화면 구성을 바꾸면 같이 고친다.
 # 탭 1 이 15개(2026-11-25 에 센 값), 탭 3 이 1개, 탭 4 가 1개(정책금리와 소비자물가를 한 차트에. 숨겨진 채로도 한 번 그린다 - template.html 의 yearRender, rateRender).
-MIN_CHARTS = 20
+MIN_CHARTS = 23
 # 탭 3 의 한 해 수익률이 이 범위를 벗어나면 단위가 바뀌었거나 지수 기준이 중간에 달라진 것으로 본다.
 # 받은 자료의 최고는 코스닥 1999년 +240.7%, 최저는 코스닥 2000년 -79.5% 다(2026-11-26 확인).
 YEAR_RANGE = (-90, 400)
@@ -271,6 +272,9 @@ def check_html(path):
     mark7 = "const TRENDS = "
     if mark7 not in html or json.JSONDecoder().raw_decode(html, html.index(mark7) + len(mark7))[0] != trend_data():
         err("HTML 에 든 추세 상태(탭 5)가 data/ 의 종가로 다시 매긴 값과 다르다")
+    mark8 = "const SLOPES = "
+    if mark8 not in html or json.JSONDecoder().raw_decode(html, html.index(mark8) + len(mark8))[0] != slope_data():
+        err("HTML 에 든 회귀 추세의 기준값(탭 6)이 data/ 의 종가로 다시 계산한 값과 다르다")
     if not errors:
         print("HTML 에 든 값이 data/ 와 같다:", len(ALL), "대상,", ALL["kospi"]["R"]["series"]["date"][-1], "까지")
 

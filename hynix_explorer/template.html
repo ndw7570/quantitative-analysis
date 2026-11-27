@@ -13,6 +13,7 @@
   --up:#d03b3b; --down:#2a78d6; --flat:#c3c2b7;
   --r0:#9ec5f4; --r1:#2a78d6; --r2:#104281;
   --t_surge:#8f1f1f; --t_chop:#eda100; --t_crash:#104281;
+  --w1:#9ec5f4; --w2:#5a9be6; --w3:#2a78d6; --w4:#1b57a3; --w5:#104281;
   --crit:#d03b3b; --note:#f0efec; --sel:rgba(11,11,11,.10); --btn:#0b0b0b; --btnink:#fcfcfb;
 }
 @media (prefers-color-scheme:dark){
@@ -24,6 +25,7 @@
     --up:#e66767; --down:#3987e5; --flat:#52514e;
     --r0:#184f95; --r1:#3987e5; --r2:#b7d3f6;
     --t_surge:#ffb0b0; --t_chop:#c98500; --t_crash:#b7d3f6;
+    --w1:#184f95; --w2:#2a6fc0; --w3:#3987e5; --w4:#7fb3ef; --w5:#b7d3f6;
     --crit:#e66767; --note:#262624; --sel:rgba(255,255,255,.14); --btn:#f0efec; --btnink:#1a1a19;
   }
 }
@@ -115,6 +117,7 @@ td small,th small{color:var(--muted);font-weight:400}
   <button role="tab" data-tab="year">여러 해 겹쳐 보기</button>
   <button role="tab" data-tab="rate">주요국 정책금리</button>
   <button role="tab" data-tab="trend">추세 상태</button>
+  <button role="tab" data-tab="slope">회귀 추세</button>
 </div>
 
 <div id="tab_explore">
@@ -327,6 +330,43 @@ td small,th small{color:var(--muted);font-weight:400}
   </ul>
 </div>
 </div>
+
+<div id="tab_slope" hidden>
+<div class="card">
+  <h2>회귀 추세 - 로그 종가를 날짜에 회귀한 기울기로 읽는 추세 (예측이 아닙니다)</h2>
+  <p class="sub">창 안의 종가(로그)에 직선을 맞춥니다. <b>기울기</b>(하루 몇 %)가 방향과 속도, <b>t-값</b>(기울기가 0 과 다르다는 확신. 보통 2 를 넘으면 추세로 봄)이 세기, <b>R²</b>(0~1. 점들이 선에 얼마나 붙는가)가 곧음입니다. 창은 <b>자동(합의 길이)</b>이거나 <b>직접</b> 고릅니다. 그날까지의 종가만 씁니다.</p>
+  <div class="ctrl">
+    <label>대상 <select id="s_asset" style="font-weight:650"></select></label>
+    <label>기간 <select id="s_span"></select></label>
+    <label>창 <select id="s_mode"><option value="auto">자동 - 합의 길이</option><option value="fixed">직접 고르기</option></select></label>
+    <label id="s_ww" hidden><input type="range" id="s_w" value="60" step="1" style="vertical-align:middle;width:220px"> <b id="s_wv">60</b>거래일</label>
+    <label id="s_cnt"></label>
+  </div>
+  <p class="hint" id="s_now"></p>
+  <div id="s_charts"></div>
+  <details id="s_runs_w" open style="margin-top:12px"><summary>이 기간의 상태 구간 (누르면 접거나 펼칩니다)</summary>
+    <div class="tw" style="margin-top:8px"><table id="s_runs"></table></div>
+    <p class="sub" style="margin-top:6px">구간 수익률은 구간 직전 거래일 종가에서 구간 마지막 날 종가까지입니다. 창·기울기·t·R² 는 구간 첫날(진입)의 값입니다.</p>
+  </details>
+  <div class="ctitle" style="margin-top:14px">전체 기간 - 상태마다 그 뒤에 무엇이 왔나 (구간 첫날 기준, <span id="s_srange"></span>)</div>
+  <p class="hint" id="s_agree"></p>
+  <div class="tw"><table id="s_stats"></table></div>
+</div>
+<div class="card">
+  <h2>읽는 법과 한계</h2>
+  <ul>
+    <li><b>회귀</b>: 창 안의 날을 0, 1, 2, ... 로 놓고 로그 종가를 그 위에 직선으로 맞춥니다(최소제곱). 기울기는 "하루에 몇 %"입니다(20일 창의 하루 1% 는 창 동안 약 +22%. 연율로 복리 환산하면 짧은 창이 수천 % 가 되어 읽을 수 없어 하루 값 그대로 둡니다). t-값은 기울기를 그 불확실성으로 나눈 것, R² 는 종가의 움직임 중 직선이 설명하는 몫입니다. 종가 차트의 주황 점선이 <b>구간 마지막 날에 고른 창의 회귀선</b>입니다 - 확대 팝업에서 구간을 바꾸면 그 구간 마지막 날의 선으로 바뀝니다.</li>
+    <li><b>자동 - 합의 길이</b>: 창 <span class="s_wins"></span>거래일 다섯에 날마다 회귀를 돌리고, <b>20일 창의 방향과 같은 방향이 이어지는 가장 긴 창</b>을 그날의 창으로 씁니다("20일부터 W일까지 전부 같은 방향 = 그 방향의 추세가 W일째"). 꺾인 직후에는 20일이고 이어질수록 길어집니다. 상태는 합의 길이가 <span class="s_lmin"></span>일 이상이고 그 창의 |t| 가 <span class="s_tin"></span> 이상이면 그 방향, 들어간 뒤에는 길이가 <span class="s_lmin"></span>일 아래로 떨어지거나 |t| 가 <span class="s_tout"></span> 아래이거나 방향이 바뀌면 보합입니다.</li>
+    <li><b>왜 "|t| 가 가장 큰 창"이 아닌가</b>: t 는 같은 추세라도 창이 길수록 커집니다(창 길이의 제곱근에 비례). 그래서 가장 큰 t 를 고르면 거의 늘 250일 창이 뽑히고 코스피의 7,445일 중 7,436일이 "상승"이 됐습니다. R² 가 가장 큰 창도 큰 상승 뒤 몇 달은 250일 창이 "가장 곧아" 급락 중에도 상승으로 남았습니다. 최근성을 규칙에 직접 넣은 것이 합의 길이입니다.</li>
+    <li><b>직접 고르기</b>: 슬라이더로 <span class="s_wmin"></span>~<span class="s_wmax"></span>거래일. 그 창 하나의 t 로 상태를 매깁니다(±<span class="s_tin"></span> 에 들어가고 ±<span class="s_tout"></span> 안쪽에서 나옴). 긴 창(120일 넘게)은 t 가 거의 늘 2 를 넘어 보합이 드뭅니다 - 아래 항목.</li>
+    <li><b>t 의 문턱 2 는 독립 표본의 기준</b>이고, 주가처럼 어제 값이 오늘 값에 이어지는 자료에서는 실제보다 크게 나옵니다. "통계적으로 유의하다"로 읽지 말고 세기의 눈금으로만 읽으세요. 창 안에 꺾임이 있으면 기울기는 그 사이의 평균입니다(창 길이가 짧을수록 최근, 길수록 평균).</li>
+    <li><b>띠</b>: "회귀"가 이 탭의 상태, "창"(자동일 때)이 그날 고른 창 길이(옅을수록 짧은 창), "탭5"가 탭 5 "추세 상태"의 6가지 상태입니다. 같은 날을 두 규칙이 어떻게 부르는지 견줍니다.</li>
+    <li><b>표</b>는 탭 5 와 같은 뜻입니다. "진입 뒤 21일·63일"은 그 상태가 시작된 날 종가에서의 수익률(평균과 오른 비율), "진입 때 고점·저점 대비"는 신호가 켜졌을 때 이미 얼마나 움직인 뒤였는가입니다. 상태가 바뀌었을 때 무엇을 할지는 이 탭이 정해 주지 않습니다.</li>
+    <li><b>계산은 화면에서</b> 합니다(창 길이가 임의라서). 코드의 <code>slope.py</code> 에 같은 계산이 있고, 파일을 만들 때 그 기준값을 넣어 두어 화면이 열릴 때 자기 계산과 견줍니다. 다르면 화면이 오류를 내고 만들기가 멈춥니다.</li>
+    <li><b>주소</b>: <code>#slope</code>, <code>#slope-hynix</code>, <code>#slope-nasdaq-y10</code>(최근 10년), <code>#slope-kospi-w120</code>(직접 고르기 120일). 확대 팝업은 탭 3·4·5 와 같습니다.</li>
+  </ul>
+</div>
+</div>
 </main>
 
 <div class="ov" id="ev"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="e_title">
@@ -351,6 +391,7 @@ const RATES = __RATES__;   // 탭 4 자료: {start, end, areas: {나라 부호: 
 const HIKE = __HIKE__;   // 탭 4 인상기 분석: {min, from, after, drop, window, areas: {US|KR: {name, ix, ix_end, cycles: [...], board: {s1..s4, count}}}} (common.py 의 hike_data)
 const EVENTS = __EVENTS__;   // 날짜별 사건 [{date, country, asset(종목 키. 빈칸이면 나라 전체), category, title, summary, source, checked}] (events/events.csv)
 const TRENDS = __TREND__;   // 탭 5 추세 상태: {params, states: 코드 6개, names, assets: {대상: {state: 날마다 0~5|null, r: 60일 수익률, vol, ref, stats, agree}}} (trend.py)
+const SLOPES = __SLOPE__;   // 탭 6 회귀 추세: {params: {wins, w_min, w_max, l_min, t_in, t_out, year}, ref: {대상: 자기 검사용 기준값}} (slope.py). 계산은 화면이 한다
 const CATS = {rate: '금리', earnings: '실적', shareholder: '주주환원', business: '투자·계약·제품', policy: '정책·규제', incident: '사고·소송', people: '경영진', other: '기타'};
 // 탭 1 툴팁의 이슈: 이슈의 날짜를 화면 달력(모든 대상이 같은 날짜 목록)의 칸 번호로 옮긴다. 장이 쉰 날의 이슈는 다음 거래일 칸에 붙는다.
 const EV_AT = {}; { const dts = ALL[KEYS[0]].R.series.date; let j = 0;
@@ -443,6 +484,8 @@ function chart(host, cfg) {
   // 값을 ymax 로 눌러 그리면 그 높이에 머문 것처럼 보이므로 누르지 않고 그림만 자른다. 툴팁은 원래 값을 보여 준다.
   let clip = null;
   if (cfg.ymax != null && hi > cfg.ymax) { hi = cfg.ymax; lo = Math.min(lo, hi); clip = 'clip' + (chart.seq = (chart.seq || 0) + 1); }
+  // ymin: 아래쪽도 같다(탭 6 의 t-값 - 긴 창은 t 가 수십이라 문턱 ±2 가 바닥에 붙는다)
+  if (cfg.ymin != null && lo < cfg.ymin) { lo = cfg.ymin; hi = Math.max(hi, lo); clip = clip || 'clip' + (chart.seq = (chart.seq || 0) + 1); }
   if (cfg.zero) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
   if (lo === hi) { lo -= 1; hi += 1; }
   let tlo = T(lo), thi = T(hi); const pad = (thi - tlo) * 0.06; tlo -= pad; thi += pad;
@@ -1412,16 +1455,154 @@ function trendRender() {
 gui('t_asset').onchange = gui('t_span').onchange = trendRender;
 trendRender();  // 숨겨진 채로 한 번 그린다(탭 3·4 와 같은 이유 - 화면 검사가 이 탭의 오류를 잡게)
 
+// ---------- 탭 6: 회귀 추세 ----------
+// 계산은 여기서 한다(슬라이더의 창 길이가 임의라서). slope.py 가 같은 계산의 기준이고, 아래 자기 검사가 둘을 견준다.
+const SP = SLOPES.params, SW = SP.wins;
+const SSTATE = {up: ['상승', '--up'], flat: ['보합', '--flat'], down: ['하락', '--down']};
+const SWIN = Object.fromEntries(SW.map((w, j) => [j, [w + '일', '--w' + (j + 1)]]));
+// 한 창의 회귀: slope.py 의 rolling_ols 와 같은 식, 같은 더하기 순서(누적합). 순서가 다르면 끝자리가 달라져 자기 검사에 걸린다.
+function rollingOls(y, w) {
+  const n = y.length, b = new Array(n).fill(null), t = new Array(n).fill(null), r2 = new Array(n).fill(null);
+  if (n < w || w < 3) return {b, t, r2};
+  const p1 = new Float64Array(n + 1), p2 = new Float64Array(n + 1), pk = new Float64Array(n + 1);
+  for (let i = 0; i < n; i++) { p1[i + 1] = p1[i] + y[i]; p2[i + 1] = p2[i] + y[i] * y[i]; pk[i + 1] = pk[i] + i * y[i]; }
+  const sxx = w * (w * w - 1) / 12;
+  for (let i = w - 1; i < n; i++) {
+    const s = i - w + 1, e = i + 1, sy = p1[e] - p1[s], syy = p2[e] - p2[s], sky = pk[e] - pk[s];
+    const sxy = (sky - s * sy) - (w - 1) / 2 * sy, sst = syy - sy * sy / w, bb = sxy / sxx, sse = Math.max(sst - bb * sxy, 0);
+    const se = Math.sqrt(sse / (w - 2) / sxx);
+    b[i] = bb; t[i] = se > 0 ? bb / se : (bb === 0 ? 0 : Infinity); r2[i] = sst > 0 ? 1 - sse / sst : 0;
+  }
+  return {b, t, r2};
+}
+// 자동 창(합의 길이)과 그 상태: slope.py 의 consensus 와 같다
+function consensus(res) {
+  const n = res[SW[0]].b.length, pick = [], st = []; let cur = 'flat';
+  for (let i = 0; i < n; i++) {
+    const b20 = res[SW[0]].b[i];
+    if (b20 == null) { pick.push(null); st.push(null); continue; }
+    const sg = Math.sign(b20); let L = 0;
+    for (let j = 0; j < SW.length; j++) { const b = res[SW[j]].b[i]; if (b == null || Math.sign(b) !== sg) break; L = j; }
+    const w = SW[L], d = sg > 0 ? 'up' : sg < 0 ? 'down' : 'flat', t = res[w].t[i];
+    if (cur !== 'flat' && (w < SP.l_min || Math.abs(t) < SP.t_out || cur !== d)) cur = 'flat';
+    if (cur === 'flat' && w >= SP.l_min && Math.abs(t) >= SP.t_in && d !== 'flat') cur = d;
+    pick.push(L); st.push(cur);
+  }
+  return {pick, st};
+}
+// 직접 고른 창 하나의 상태: slope.py 의 slope_states
+function fixedStates(t) { const out = []; let cur = 'flat';
+  for (const v of t) { if (v == null) { out.push(null); continue; }
+    if (cur !== 'flat' && Math.abs(v) < SP.t_out) cur = 'flat';
+    if (cur === 'flat') cur = v >= SP.t_in ? 'up' : v <= -SP.t_in ? 'down' : 'flat';
+    out.push(cur); } return out; }
+const sRuns = st => { const out = []; let a = null;  // trend.py 의 runs
+  for (let i = 0; i <= st.length; i++) { const s = i < st.length ? st[i] : null;
+    if (a != null && s !== st[a]) { out.push([a, i - 1, st[a]]); a = null; }
+    if (s != null && a == null) a = i; } return out; };
+const sCache = {};
+const sData = key => sCache[key] || (sCache[key] = (() => {
+  const C = ALL[key].R.series.close, first = C.findIndex(v => v != null), y = C.slice(first).map(Math.log), res = {};
+  SW.forEach(w => res[w] = rollingOls(y, w));
+  return {first, y, res, auto: consensus(res)}; })());
+// 자기 검사: 화면의 회귀 계산이 slope.py 의 기준값과 같은가. 다르면 여기서 멈춘다(check.py 의 화면 검사가 "스크립트 오류"로 잡는다).
+{ const bad = [], near = (a, b) => Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(b));
+  for (const key of KEYS) { const D = sData(key), R = SLOPES.ref[key], n = D.y.length;
+    if (D.first !== R.first || n !== R.n) { bad.push(`${key}: 길이 ${D.first}/${n} vs ${R.first}/${R.n}`); continue; }
+    SW.forEach(w => { const r = D.res[w], L = R.last[w];
+      if (!near(r.b[n - 1], L.slope) || !near(r.t[n - 1], L.t) || !near(r.r2[n - 1], L.r2)) bad.push(`${key} ${w}일: ${r.b[n - 1]},${r.t[n - 1]},${r.r2[n - 1]} vs ${L.slope},${L.t},${L.r2}`); });
+    const cnt = k => D.auto.st.filter(s => s === k).length;
+    if (['up', 'flat', 'down'].some(k => cnt(k) !== R.auto.days[k]) || sRuns(D.auto.st).length !== R.auto.runs
+        || SW.some(w => D.auto.pick.filter(j => j != null && SW[j] === w).length !== R.auto.wins[w])) bad.push(`${key}: 자동 창의 상태 일수·구간·창 선택이 다르다`); }
+  if (bad.length) throw new Error('회귀 추세 자기 검사 실패: ' + bad.slice(0, 3).join(' | ')); }
+gui('s_asset').innerHTML = assetOpts; gui('s_asset').value = 'kospi';
+gui('s_span').innerHTML = gui('t_span').innerHTML; gui('s_span').value = '3';
+gui('s_w').min = SP.w_min; gui('s_w').max = SP.w_max;
+for (const [cls, v] of [['s_wins', SW.join('·')], ['s_lmin', SP.l_min], ['s_tin', SP.t_in], ['s_tout', SP.t_out], ['s_wmin', SP.w_min], ['s_wmax', SP.w_max]])
+  document.querySelectorAll('.' + cls).forEach(e => e.textContent = v);
+// 기울기는 "하루 몇 %"로 보여 준다. 연율로 복리 환산하면 20일 창의 기울기가 수천 % 가 되어 읽을 수 없다(처음에 그렇게 했다가 바꿈)
+const sDay = b => b == null ? null : b * 100, sWin = (b, w) => b == null ? null : (Math.exp(b * (w - 1)) - 1) * 100, pd2 = v => (v > 0 ? '+' : '') + v.toFixed(2) + '%', tDir = s => s == null ? null : s <= 1 ? 'up' : s <= 3 ? 'flat' : 'down';
+// 상태별 통계: trend.py 의 trend_stats 를 화면에서(창 길이가 임의라서). 진입(구간 첫날)만 센다. 첫날은 진입이 아니다.
+function sStats(ST, C) {
+  const rs = sRuns(ST), total = ST.filter(s => s != null).length, out = {};
+  const pct = (i, j) => (i < 0 || j >= N || C[i] == null || C[j] == null || !C[i]) ? null : (C[j] / C[i] - 1) * 100;
+  const agg = v => { v = v.filter(x => x != null); if (!v.length) return {n: 0, mean: null, med: null, pos: null}; const s = [...v].sort((p, q) => p - q);
+    return {n: v.length, mean: v.reduce((p, q) => p + q, 0) / v.length, med: s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2, pos: v.filter(x => x > 0).length / v.length * 100}; };
+  for (const k of ['up', 'flat', 'down']) { const mine = rs.filter(r => r[2] === k), ent = mine.map(r => r[0]).filter(a => a > 0), lens = mine.map(r => r[1] - r[0] + 1);
+    const late = ent.map(a => { let ext = C[a]; for (let i = Math.max(0, a - TP.hi_n); i <= a; i++) if (C[i] != null) ext = k === 'up' ? Math.min(ext, C[i]) : Math.max(ext, C[i]); return C[a] == null || !ext ? null : (C[a] / ext - 1) * 100; });
+    const days = lens.reduce((p, q) => p + q, 0);
+    out[k] = {days, share: total ? days / total * 100 : null, runs: mine.length, med_len: agg(lens).med, f21: agg(ent.map(a => pct(a, a + TP.fwd[0]))), f63: agg(ent.map(a => pct(a, a + TP.fwd[1]))), late: agg(late)}; }
+  return out;
+}
+function slopeRender() {
+  const key = gui('s_asset').value, M = ALL[key].R.meta, Sx = ALL[key].R.series, span = +gui('s_span').value, auto = gui('s_mode').value === 'auto', w = +gui('s_w').value;
+  gui('s_ww').hidden = auto; gui('s_wv').textContent = w;
+  const D = sData(key), f0 = D.first;
+  if (!auto && !D.res[w]) D.res[w] = rollingOls(D.y, w);
+  // 날짜 칸(0..N-1)으로 편다: 상태, 그날 고른 창, 그 창의 기울기(연율)·t·R²
+  const ST = Array.from({length: N}, (_, i) => i < f0 ? null : auto ? D.auto.st[i - f0] : null);
+  if (!auto) { const fs = fixedStates(D.res[w].t); for (let i = f0; i < N; i++) ST[i] = fs[i - f0]; }
+  const pickW = i => i < f0 ? null : auto ? (D.auto.pick[i - f0] == null ? null : SW[D.auto.pick[i - f0]]) : w;
+  const val = (k, i) => { const ww = pickW(i); return ww == null ? null : D.res[ww][k][i - f0]; };
+  const SL = Array.from({length: N}, (_, i) => sDay(val('b', i))), TT = Array.from({length: N}, (_, i) => val('t', i)), R2 = Array.from({length: N}, (_, i) => val('r2', i));
+  const first = ST.findIndex(s => s != null), last = S.date[N - 1], cut = (+last.slice(0, 4) - span) + last.slice(4);
+  const a0 = span ? Math.max(first, S.date.findIndex(d => d >= cut)) : first, b0 = N - 1;
+  gui('s_cnt').textContent = `${S.date[a0]} ~ ${last} (${(b0 - a0 + 1).toLocaleString('ko-KR')}거래일)`;
+  { let i = N - 1; while (i > 0 && ST[i - 1] === ST[N - 1]) i--; const s = ST[N - 1];
+    gui('s_now').innerHTML = s == null ? `${esc(M.name)}: 마지막 날의 값을 낼 자료가 모자랍니다.` :
+      `<b>${esc(M.name)} ${last}: ${SSTATE[s][0]}</b> - ${S.date[i]} 부터 ${N - i}거래일째 · 창 ${pickW(N - 1)}일${auto ? ' (합의 길이)' : ''} · 기울기 하루 ${pd2(SL[N - 1])} (회귀선이 창 ${pickW(N - 1)}일 동안 ${pc(sWin(val('b', N - 1), pickW(N - 1)))}) · t ${TT[N - 1].toFixed(1)} · R² ${R2[N - 1].toFixed(2)}` +
+      (auto ? ` · 창마다: ${SW.map(ww => `${ww}일 ${pd2(sDay(D.res[ww].b[N - 1 - f0]))} (t ${D.res[ww].t[N - 1 - f0].toFixed(1)})`).join(', ')}` : ''); }
+  const tv = v => v.toFixed(1);
+  const make = (a, b, zoom) => {
+    const sl = arr => arr.slice(a, b + 1), dates = sl(S.date), nn = dates.length, abs = (i, j) => [a + i, a + j], big = zoom ? 80 : 0;
+    // 구간 마지막 날의 회귀선: 그날 고른 창 안에서만 그리고 바깥은 비운다. 절편 = 창의 로그 종가 평균 - 기울기 x (w-1)/2
+    const wb = pickW(b), fit = Array(nn).fill(null);
+    if (wb != null && b - f0 >= wb - 1) { const bb = D.res[wb].b[b - f0]; let m = 0; for (let k = 0; k < wb; k++) m += D.y[b - f0 - wb + 1 + k]; m /= wb; const ic = m - bb * (wb - 1) / 2;
+      for (let k = 0; k < wb; k++) { const i = b - wb + 1 + k; if (i >= a) fit[i - a] = Math.exp(ic + bb * k); } }
+    const strips = [{name: '회귀', vals: sl(ST), map: SSTATE}, ...(auto ? [{name: '창', vals: sl(Array.from({length: N}, (_, i) => i < f0 ? null : D.auto.pick[i - f0])), map: SWIN}] : []),
+                    {name: '탭5', vals: sl(TRENDS.assets[key].state), map: TSTATE}];
+    const slopeLines = auto ? SW.map((ww, j) => ({name: ww + '일 창', vals: [sl(Array.from({length: N}, (_, i) => i < f0 ? null : sDay(D.res[ww].b[i - f0])))], color: '--w' + (j + 1), w: 0.9, fmt: pd2, noEnd: true})) : [];
+    return {sub: `${M.name} · ${dates[0]} ~ ${dates[nn - 1]} (${nn}거래일) · 창 ${auto ? '자동(합의 길이)' : w + '일'} · 차트 위를 다시 끌면 더 좁혀집니다 · Esc 나 바깥을 누르면 닫힙니다`, items: [
+      {title: `${M.name} 종가 (로그 눈금) · 주황 점선: ${dates[nn - 1]} 의 회귀선(${wb == null ? '-' : wb + '일 창'}) · 띠: 회귀 상태 / ${auto ? '고른 창 / ' : ''}탭 5 의 상태`, abs,
+       cfg: {dates, h: 260 + big, log: true, fmt: paxis(M), aria: M.name + ' 종가와 회귀 추세', strips,
+             lines: [{name: '종가', vals: [sl(Sx.close)], color: '--ink', fmt: pfmt(M), w: 1.6}, {name: `회귀선 (${wb}일)`, vals: [fit], color: '--s2', dash: '5 3', fmt: pfmt(M), w: 1.8, noEnd: true}]}},
+      {title: `기울기 - 하루 % (${auto ? '검은 선이 그날 고른 창, 가는 파란 선이 창 다섯 - 옅을수록 짧은 창' : w + '일 창'})`, abs,
+       cfg: {dates, h: 180 + big, zero: true, fmt: v => v.toFixed(1) + '%', aria: M.name + ' 회귀 기울기', lines: [...slopeLines, {name: auto ? '고른 창' : w + '일 창', vals: [sl(SL)], color: '--ink', fmt: pd2, w: 1.6}]}},
+      {title: `t-값 (세기) · 바깥 점선 ±${SP.t_in} 을 넘으면 들어가고 안쪽 점선 ±${SP.t_out} 안으로 오면 보합 · ±10 을 넘는 값은 잘라 그림(값은 마우스를 올리면)`, abs,
+       cfg: {dates, h: 160 + big, zero: true, ymax: 10, ymin: -10, fmt: v => v.toFixed(0), aria: M.name + ' 회귀 t-값', lines: [{name: 't-값', vals: [sl(TT)], color: '--ink', fmt: tv, w: 1.4},
+             {name: `±${SP.t_in}`, vals: [tConst(nn, SP.t_in), tConst(nn, -SP.t_in)], color: '--ink2', dash: '5 3', fmt: tv, noEnd: true},
+             {name: `±${SP.t_out}`, vals: [tConst(nn, SP.t_out), tConst(nn, -SP.t_out)], color: '--muted', dash: '2 3', fmt: tv, noEnd: true}]}}]};
+  };
+  drawSet(gui('s_charts'), make(a0, b0).items, make);
+  // 이 기간의 상태 구간(기간 첫날에 걸친 구간은 진짜 시작일부터)
+  const C = Sx.close, rows = []; let i = a0; while (i > first && ST[i - 1] === ST[a0]) i--;
+  for (; i <= b0;) { const s = ST[i]; let j = i; while (j < N - 1 && ST[j + 1] === s) j++;
+    if (s != null) { const ret = i > 0 && C[i - 1] ? C[j] / C[i - 1] * 100 - 100 : null;
+      rows.push(`<tr><td><i style="display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:5px;background:var(${SSTATE[s][1]})"></i>${SSTATE[s][0]}</td><td>${S.date[i]}</td><td>${j === N - 1 ? '진행 중' : S.date[j]}</td><td>${j - i + 1}</td><td>${ret == null ? '-' : pc(ret)}</td><td>${pickW(i)}일</td><td>${pd2(SL[i])}</td><td>${tv(TT[i])}</td><td>${R2[i].toFixed(2)}</td></tr>`); }
+    i = j + 1; }
+  gui('s_runs').innerHTML = '<tr><th>상태</th><th>시작</th><th>끝</th><th>거래일</th><th>구간 수익률</th><th>진입 때 창</th><th>기울기(하루 %)</th><th>t</th><th>R²</th></tr>' + rows.join('');
+  gui('s_runs_w').open = rows.length <= 60;
+  const st = sStats(ST, C), f = v => v == null ? '-' : (v > 0 ? '+' : '') + v.toFixed(1) + '%', fp = v => v == null ? '-' : v.toFixed(0) + '%';
+  gui('s_srange').textContent = `${S.date[first]} ~ ${last}`;
+  { const T5 = TRENDS.assets[key].state; let same = 0, both = 0; for (let k = 0; k < N; k++) if (ST[k] != null && T5[k] != null) { both++; if (ST[k] === tDir(T5[k])) same++; }
+    gui('s_agree').textContent = `이 상태가 탭 5 "추세 상태"의 방향과 같은 날 ${both ? fp(same / both * 100) : '-'}`; }
+  gui('s_stats').innerHTML = `<tr><th>상태</th><th>일수 (비율)</th><th>구간 수</th><th>지속 중위(일)</th><th>진입 뒤 ${TP.fwd[0]}일 평균 · 오른 비율</th><th>진입 뒤 ${TP.fwd[1]}일 평균 · 오른 비율</th><th>진입 때 고점·저점 대비 (중위)</th></tr>` +
+    ['up', 'flat', 'down'].map(k => { const x = st[k], ww = g => `${f(g.mean)} · ${fp(g.pos)}`;
+      return `<tr><td><i style="display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:5px;background:var(${SSTATE[k][1]})"></i>${SSTATE[k][0]}</td><td>${x.days.toLocaleString('ko-KR')} (${fp(x.share)})</td><td>${x.runs}</td><td>${x.med_len == null ? '-' : x.med_len}</td><td>${ww(x.f21)}</td><td>${ww(x.f63)}</td><td>${f(x.late.med)}${k === 'up' ? ' (저점)' : ' (고점)'}</td></tr>`; }).join('');
+}
+gui('s_asset').onchange = gui('s_span').onchange = gui('s_mode').onchange = gui('s_w').oninput = slopeRender;
+slopeRender();  // 숨겨진 채로 한 번 그린다(화면 검사가 이 탭의 오류를 잡게)
+
 const tabBtns = document.querySelectorAll('.tabs button');
 function setTab(t) {
   tabBtns.forEach(b => { const on = b.dataset.tab === t; b.classList.toggle('on', on); b.setAttribute('aria-selected', on);
     gui('tab_' + b.dataset.tab).hidden = !on; });
   splitBtn.hidden = t !== 'explore';
   // 숨겨진 동안에는 폭이 0이라 차트를 못 그린다. 보이게 된 쪽을 그때 다시 그린다.
-  if (t === 'sig') sigRender(); else if (t === 'year') yearRender(); else if (t === 'rate') rateRender(); else if (t === 'trend') trendRender(); else window.dispatchEvent(new Event('resize'));
+  if (t === 'sig') sigRender(); else if (t === 'year') yearRender(); else if (t === 'rate') rateRender(); else if (t === 'trend') trendRender(); else if (t === 'slope') slopeRender(); else window.dispatchEvent(new Event('resize'));
 }
 tabBtns.forEach(b => b.onclick = () => setTab(b.dataset.tab));
-window.addEventListener('resize', () => { if (!gui('tab_sig').hidden) sigRender(); if (!gui('tab_year').hidden) yearRender(); if (!gui('tab_rate').hidden) rateRender(); if (!gui('tab_trend').hidden) trendRender();
+window.addEventListener('resize', () => { if (!gui('tab_sig').hidden) sigRender(); if (!gui('tab_year').hidden) yearRender(); if (!gui('tab_rate').hidden) rateRender(); if (!gui('tab_trend').hidden) trendRender(); if (!gui('tab_slope').hidden) slopeRender();
   if (zHist.length && gui('zv').classList.contains('on')) zoomDraw(); });
 tabBtns[0].classList.add('on');
 { // 점검·공유용: #sig, #sig-2026-06-22, #sig-2026-06-22-f12, #sig-2026-06-22-f12-kospi 처럼 탭·기준일·지표·대상을 주소로 연다
@@ -1456,6 +1637,12 @@ tabBtns[0].classList.add('on');
   if (tm) { if (tm[1] && ALL[tm[1]]) gui('t_asset').value = tm[1];
     if (tm[2] && [...gui('t_span').options].some(o => o.value === tm[2])) gui('t_span').value = tm[2];
     setTab('trend'); }
+  // #slope, #slope-kospi, #slope-nasdaq-y10(최근 10년), #slope-kospi-w120(직접 고르기 120일): 탭 6 의 대상·기간·창
+  const sm = location.hash.match(/^#slope(?:-([a-z]+)(?![a-z]))?(?:-y(\d+))?(?:-w(\d+))?/);
+  if (sm) { if (sm[1] && ALL[sm[1]]) gui('s_asset').value = sm[1];
+    if (sm[2] && [...gui('s_span').options].some(o => o.value === sm[2])) gui('s_span').value = sm[2];
+    if (sm[3] && +sm[3] >= SP.w_min && +sm[3] <= SP.w_max) { gui('s_mode').value = 'fixed'; gui('s_w').value = sm[3]; }
+    setTab('slope'); }
   // #assets-samsung-kospi: 탭 1의 왼쪽·오른쪽 창 대상을 주소로 정한다
   const am = location.hash.match(/assets-([a-z]+)-([a-z]+)/);
   if (am && ALL[am[1]] && ALL[am[2]]) { panes.L.setAsset(am[1]); panes.R.setAsset(am[2]); }
@@ -1476,8 +1663,8 @@ if (location.hash.startsWith('#test')) setTimeout(() => {
 /* 탭 3·4 의 확대 팝업도 같은 식으로 본다: 주소 끝에 -zoom(첫 차트), -zoom2(둘째 차트)를 붙이면 그 차트의 45% ~ 75% 자리를 끈다.
    -zoomzoom 은 열린 팝업의 첫 차트를 한 번 더 끈다(팝업 안에서 다시 좁히는 길). 끝에 back 을 더 붙이면 "이전 확대"까지 누른다.
    예: #year-2018-rus-zoom, #rate-us-kr-y30-split-zoom2, #rate-us-kr-zoomzoomback */
-{ const zm = location.hash.match(/^#(year|rate|trend).*?-zoom(zoom)?(\d?)(back)?$/);
-  if (zm) setTimeout(() => { dragSvg(gui({year: 'y_charts', rate: 'r_charts', trend: 't_charts'}[zm[1]]).querySelectorAll('.chart svg')[(+zm[3] || 1) - 1], 0.45, 0.75);
+{ const zm = location.hash.match(/^#(year|rate|trend|slope).*?-zoom(zoom)?(\d?)(back)?$/);
+  if (zm) setTimeout(() => { dragSvg(gui({year: 'y_charts', rate: 'r_charts', trend: 't_charts', slope: 's_charts'}[zm[1]]).querySelectorAll('.chart svg')[(+zm[3] || 1) - 1], 0.45, 0.75);
     if (zm[2]) dragSvg(gui('z_body').querySelector('.chart svg'), 0.3, 0.6);
     if (zm[4]) gui('z_back').click(); }, 100); }
 </script>
